@@ -1,17 +1,19 @@
 #[cfg(test)]
 mod test {
     use chrono::NaiveDateTime;
+    use itertools::Itertools;
     use regex::Regex;
+    use std::cmp::Ordering;
     use std::fs;
     use std::str::FromStr;
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, Eq, PartialEq)]
     struct LogEntry {
-        datetime: NaiveDateTime,
-        event: Event,
+        pub datetime: NaiveDateTime,
+        pub event: Event,
     }
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, Eq, PartialEq)]
     enum Event {
         GuardBeginsShift(u32),
         FallsAsleep,
@@ -59,6 +61,7 @@ mod test {
     fn input() {
         let x: Vec<LogEntry> = fs::read_to_string("day4.txt").unwrap().lines()
             .map(|line| LogEntry::from_str(line).unwrap())
+            .sorted_by_key(|entry| entry.datetime)
             .collect();
 
         dbg!(x);
