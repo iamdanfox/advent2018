@@ -5,6 +5,7 @@ mod test {
     use core::fmt::Write;
     use itertools::Itertools;
     use regex::Regex;
+    use std::collections::HashMap;
     use std::fmt::Debug;
     use std::fmt::Error;
     use std::fmt::Formatter;
@@ -27,19 +28,20 @@ mod test {
         WakesUp,
     }
 
-    struct GuardSleepReport {
+    #[derive(Copy, Clone)]
+    struct GuardShiftReport {
         pub guard_id: GuardId,
         /// minutes spent asleep during the midnight hour
         pub asleep_minutes: [bool; 60],
     }
 
-    impl GuardSleepReport {
+    impl GuardShiftReport {
         pub fn minutes_spent_asleep(&self) -> usize {
             self.asleep_minutes.iter().filter(|&&b| b).count()
         }
     }
 
-    impl Debug for GuardSleepReport {
+    impl Debug for GuardShiftReport {
         fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
             f.write_char('#')?;
             self.guard_id.fmt(f)?;
@@ -52,7 +54,7 @@ mod test {
         }
     }
 
-    fn guard_sleep_reports(entries: &[LogEntry]) -> Vec<GuardSleepReport> {
+    fn guard_sleep_reports(entries: &[LogEntry]) -> Vec<GuardShiftReport> {
         let mut result = vec![];
 
         let mut guard_id = None;
@@ -65,7 +67,7 @@ mod test {
                 Event::GuardBeginsShift(id) => {
                     assert_eq!(asleep_since, None);
                     if let Some(prev_guard_id) = guard_id {
-                        result.push(GuardSleepReport {
+                        result.push(GuardShiftReport {
                             guard_id: prev_guard_id,
                             asleep_minutes,
                         });
@@ -88,7 +90,7 @@ mod test {
         }
 
         if let Some(prev_guard_id) = guard_id {
-            result.push(GuardSleepReport {
+            result.push(GuardShiftReport {
                 guard_id: prev_guard_id,
                 asleep_minutes,
             });
@@ -145,27 +147,28 @@ mod test {
             .collect();
         let reports = guard_sleep_reports(&log);
 
-        let worst_guard_leaderboard: Vec<(GuardId, usize)> = reports
+        let reports_by_guard_id: HashMap<GuardId, Vec<&GuardShiftReport>> = reports
             .iter()
-            .sorted_by_key(|report| report.guard_id)
-            .map(|report| (report.guard_id, report.minutes_spent_asleep()))
-            .coalesce(|prev, curr| {
-                if prev.0 == curr.0 {
-                    Ok((prev.0, prev.1 + curr.1))
-                } else {
-                    Err((prev, curr))
-                }
+            .map(|report| (report.guard_id, report))
+            .into_group_map();
+
+        let worst_guard = &reports_by_guard_id
+            .iter()
+            .map(|(&guard, vec)| -> (GuardId, usize) {
+                (
+                    guard,
+                    vec.iter().map(|report| report.minutes_spent_asleep()).sum(),
+                )
             })
-            .sorted_by_key(|pair| pair.1)
-            .collect();
+            .collect_vec();
 
-        let worst_guard: &(GuardId, usize) = worst_guard_leaderboard
+        let sleepiest_guard_id: GuardId = worst_guard
             .iter()
-            .max_by_key(|&pair| pair.1)
-            .unwrap();
+            .max_by_key(|(_guard, mins_asleep)| mins_asleep)
+            .unwrap()
+            .0;
 
-        let sleepiest_guard_id: GuardId = worst_guard.0;
-        assert_eq!(sleepiest_guard_id, 761); // this is the guard with most minutes spent asleep
+        assert_eq!(sleepiest_guard_id, 761);
 
         let mut aggregate_asleep_minutes: [u32; 60] = [0; 60];
 
