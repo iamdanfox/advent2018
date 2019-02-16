@@ -3,21 +3,28 @@ mod test {
     use itertools::Itertools;
     use multiset::HashMultiSet;
     use regex::Regex;
+    use std::collections::HashSet;
     use std::fs;
     use std::num::ParseIntError;
     use std::str::FromStr;
-    use std::collections::HashSet;
 
     type Square = (usize, usize);
 
     #[test]
     fn part1() {
-        assert_eq!(Claim::contended_squares(input()).len(), 117505);
+        assert_eq!(Claim::contended_squares(&input()).len(), 117505);
     }
 
-    #[derive(Debug, PartialEq)]
+    #[test]
+    fn part2() {
+        let uncontended: Vec<Claim> = Claim::find_uncontended_claims(&input());
+        assert_eq!(uncontended.len(), 1);
+        assert_eq!(uncontended[0].id, 1254);
+    }
+
+    #[derive(Debug, PartialEq, Copy, Clone)]
     struct Claim {
-        id: usize,
+        pub id: usize,
         offset_left: usize,
         offset_top: usize,
         width: usize,
@@ -25,13 +32,19 @@ mod test {
     }
 
     impl Claim {
-        fn squares(&self) -> impl Iterator<Item = Square> {
+        pub fn squares(&self) -> impl Iterator<Item = Square> {
             let xs = self.offset_left..(self.offset_left + self.width);
             let ys = self.offset_top..(self.offset_top + self.height);
             xs.cartesian_product(ys)
         }
 
-        fn contended_squares(claims: Vec<Claim>) -> HashSet<Square> {
+        pub fn contains(&self, (x, y): Square) -> bool {
+            let hit_x = self.offset_left <= x && x < self.offset_left + self.width;
+            let hit_y = self.offset_top <= y && y < self.offset_top + self.height;
+            hit_x && hit_y
+        }
+
+        pub fn contended_squares(claims: &[Claim]) -> HashSet<Square> {
             let squares: HashMultiSet<Square> = claims.iter().flat_map(Claim::squares).collect();
 
             let mut contended = HashSet::new();
@@ -43,6 +56,21 @@ mod test {
             }
 
             contended
+        }
+
+        pub fn find_uncontended_claims(claims: &[Claim]) -> Vec<Claim> {
+            let contended = Claim::contended_squares(claims);
+
+            let is_contended =
+                |claim: &Claim| -> bool { contended.iter().any(|&square| claim.contains(square)) };
+
+            let result: Vec<Claim> = claims
+                .iter()
+                .filter(|claim| !is_contended(claim))
+                .map(|&claim| claim)
+                .collect();
+
+            result
         }
     }
 
@@ -98,7 +126,16 @@ mod test {
         let c1 = Claim::from_str("#123 @ 0,0: 1x1").unwrap();
         let c2 = Claim::from_str("#124 @ 0,0: 1x1").unwrap();
         let c3 = Claim::from_str("#125 @ 0,0: 2x2").unwrap();
-        assert_eq!(Claim::contended_squares(vec![c1, c2, c3]).len(), 1);
+        assert_eq!(Claim::contended_squares(&[c1, c2, c3]).len(), 1);
+    }
+
+    #[test]
+    fn contains_works() {
+        assert!(Claim::from_str("#123 @ 0,0: 1x1").unwrap().contains((0, 0)));
+        assert!(!Claim::from_str("#123 @ 0,0: 1x1").unwrap().contains((1, 1)));
+
+        assert!(!Claim::from_str("#123 @ 0,0: 2x2").unwrap().contains((2, 5)));
+        assert!(!Claim::from_str("#123 @ 0,0: 2x2").unwrap().contains((3, 3)));
     }
 
     fn input() -> Vec<Claim> {
