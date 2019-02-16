@@ -91,7 +91,9 @@ mod day2 {
     #[test]
     fn part2() {
         assert_eq!(
-            find_strings_differing_by_1(vec!("abcde", "fghij", "klmno", "pqrst", "fguij", "axcye", "wvxyz")),
+            find_strings_differing_by_1(vec!(
+                "abcde", "fghij", "klmno", "pqrst", "fguij", "axcye", "wvxyz"
+            )),
             HashSet::from_iter(vec!("fgij".to_owned()))
         );
 
@@ -104,7 +106,10 @@ mod day2 {
     fn diff_strings(left: &str, right: &str) -> (usize, String) {
         assert_eq!(left.len(), right.len());
 
-        let matching: Vec<u8> = left.as_bytes().iter().zip(right.as_bytes())
+        let matching: Vec<u8> = left
+            .as_bytes()
+            .iter()
+            .zip(right.as_bytes())
             .filter(|(&left_byte, &right_byte)| left_byte == right_byte)
             .map(|(&left_byte, _)| left_byte)
             .collect();
