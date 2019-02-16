@@ -1,10 +1,15 @@
 #[cfg(test)]
 mod test {
     use chrono::NaiveDateTime;
+    use chrono::Timelike;
+    use core::fmt::Write;
     use itertools::Itertools;
     use regex::Regex;
-    use std::cmp::Ordering;
+    use std::fmt::Debug;
+    use std::fmt::Error;
+    use std::fmt::Formatter;
     use std::fs;
+    use std::option::Option::Some;
     use std::str::FromStr;
 
     #[derive(Debug, Eq, PartialEq)]
@@ -18,6 +23,62 @@ mod test {
         GuardBeginsShift(u32),
         FallsAsleep,
         WakesUp
+    }
+
+    struct GuardSleepReport {
+        pub id: u32,
+        /// minutes spent asleep during the midnight hour
+        pub asleep_minutes: [bool; 60],
+    }
+
+    impl Debug for GuardSleepReport {
+        fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+            f.write_char('#')?;
+            self.id.fmt(f)?;
+            f.write_str(": ")?;
+            for &asleep in self.asleep_minutes.iter() {
+                f.write_char(if asleep { '#' } else { '.' })?;
+            }
+            Ok(())
+        }
+    }
+
+    fn guard_sleep_reports(entries: &[LogEntry]) -> Vec<GuardSleepReport> {
+        let mut result = vec![];
+
+        let mut guard_id = None;
+        let mut asleep_since = None;
+        let mut asleep_minutes = [false; 60];
+
+        for entry in entries {
+            let current_time = entry.datetime.time().minute() as usize;
+            match entry.event {
+                Event::GuardBeginsShift(id) => {
+                    if let Some(prev_guard_id) = guard_id {
+                        result.push(GuardSleepReport {
+                            id: prev_guard_id,
+                            asleep_minutes,
+                        });
+                        asleep_minutes = [false; 60];
+                    }
+
+                    guard_id = Some(id);
+                    // TODO can a guard handover when the last is asleep?
+                },
+                Event::FallsAsleep => {
+                    assert_eq!(asleep_since, None);
+                    asleep_since = Some(current_time);
+                },
+                Event::WakesUp => {
+                    for minute in asleep_since.unwrap()..current_time {
+                        asleep_minutes[minute] = true;
+                    }
+                    asleep_since = None
+                },
+            }
+        }
+
+        result
     }
 
     impl FromStr for Event {
@@ -59,11 +120,12 @@ mod test {
 
     #[test]
     fn input() {
-        let x: Vec<LogEntry> = fs::read_to_string("day4.txt").unwrap().lines()
+        let log: Vec<LogEntry> = fs::read_to_string("day4.txt").unwrap().lines()
             .map(|line| LogEntry::from_str(line).unwrap())
             .sorted_by_key(|entry| entry.datetime)
             .collect();
 
-        dbg!(x);
+
+        dbg!(guard_sleep_reports(&log));
     }
 }
