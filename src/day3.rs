@@ -16,13 +16,25 @@ mod test {
         type Err = ();
 
         fn from_str(line: &str) -> Result<Self, Self::Err> {
-            let re: Regex = Regex::new(r"^#(?P<id>\d+) @ (?P<offset_left>\d+),(?P<offset_top>\d+): (?P<width>\d+)x(?P<height>\d+)$").unwrap();
+            lazy_static! {
+                static ref re: Regex = Regex::new(r"^#(?P<id>\d+) @ (?P<offset_left>\d+),(?P<offset_top>\d+): (?P<width>\d+)x(?P<height>\d+)$").unwrap();
+            }
             let captures = re.captures(line).unwrap();
 
             Ok(Claim {
                 id: captures.name("id").unwrap().as_str().parse().unwrap(),
-                offset_left: captures.name("offset_left").unwrap().as_str().parse().unwrap(),
-                offset_top: captures.name("offset_top").unwrap().as_str().parse().unwrap(),
+                offset_left: captures
+                    .name("offset_left")
+                    .unwrap()
+                    .as_str()
+                    .parse()
+                    .unwrap(),
+                offset_top: captures
+                    .name("offset_top")
+                    .unwrap()
+                    .as_str()
+                    .parse()
+                    .unwrap(),
                 width: captures.name("width").unwrap().as_str().parse().unwrap(),
                 height: captures.name("height").unwrap().as_str().parse().unwrap(),
             })

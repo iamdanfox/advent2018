@@ -72,8 +72,8 @@ mod test {
 
     impl FromIterator<ChecksumEntry> for Checksum {
         fn from_iter<I>(iter: I) -> Self
-            where
-                I: IntoIterator<Item = ChecksumEntry>,
+        where
+            I: IntoIterator<Item = ChecksumEntry>,
         {
             let mut twos: u64 = 0;
             let mut threes: u64 = 0;
