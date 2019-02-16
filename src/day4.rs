@@ -5,7 +5,6 @@ mod test {
     use core::fmt::Write;
     use itertools::Itertools;
     use regex::Regex;
-    use std::collections::HashMap;
     use std::fmt::Debug;
     use std::fmt::Error;
     use std::fmt::Formatter;
@@ -70,15 +69,49 @@ mod test {
         }
     }
 
+    #[derive(Debug)]
     struct GuardReport {
         pub guard_id: GuardId,
-        pub asleep_minutes: Vec<SleepReport>,
+        pub reports: Vec<SleepReport>,
     }
 
     impl GuardReport {
-        fn total_minutes_asleep(&self) -> usize {
-            self.asleep_minutes.iter().map(|r| r.count()).sum()
+        pub fn total_minutes_asleep(&self) -> usize {
+            self.reports.iter().map(|r| r.count()).sum()
         }
+
+        pub fn cumulative_sleep_histogram(&self) -> [u32; 60] {
+            let mut histogram: [u32; 60] = [0; 60];
+
+            for report in &self.reports {
+                for (min, &asleep) in report.iter().enumerate() {
+                    if asleep {
+                        histogram[min] += 1
+                    }
+                }
+            }
+
+            histogram
+        }
+
+        pub fn sleepiest_minute(&self) -> usize {
+            self.cumulative_sleep_histogram()
+                .iter()
+                .enumerate()
+                .max_by_key(|(_minute, &asleep_count)| asleep_count)
+                .unwrap()
+                .0
+        }
+//
+//        pub fn sleep_likelihood(&self) -> [f32; 60] {
+//            let mut likelihood = [0f32; 60];
+//            let num_reports = self.reports.len() as f32;
+//            let histogram = self.cumulative_sleep_histogram();
+//            for (index, &count) in histogram.iter().enumerate() {
+//                likelihood[index] = count as f32 / num_reports;
+//            }
+//            likelihood
+//        }
     }
 
     fn guard_sleep_reports(entries: &[LogEntry]) -> Vec<GuardShiftReport> {
@@ -174,51 +207,32 @@ mod test {
             .collect();
         let reports = guard_sleep_reports(&log);
 
-        let reports_by_guard_id: HashMap<GuardId, Vec<&GuardShiftReport>> = reports
+        let guard_reports: Vec<GuardReport> = reports
             .iter()
             .map(|report| (report.guard_id, report))
-            .into_group_map();
-
-        let worst_guard = &reports_by_guard_id
+            .into_group_map()
             .iter()
             .map(|(&guard, vec)| -> GuardReport {
                 GuardReport {
                     guard_id: guard,
-                    asleep_minutes: vec.iter().map(|report| report.asleep_minutes).collect()
+                    reports: vec.iter().map(|report| report.asleep_minutes).collect()
                 }
             })
             .collect_vec();
 
-        let sleepiest_guard_id: GuardId = worst_guard
+        dbg!(&guard_reports);
+
+        let sleepiest_guard: &GuardReport = guard_reports
             .iter()
             .max_by_key(|report| report.total_minutes_asleep())
-            .unwrap()
-            .guard_id;
+            .unwrap();
 
-        assert_eq!(sleepiest_guard_id, 761);
+        assert_eq!(sleepiest_guard.guard_id, 761);
 
-        let mut histogram: [u32; 60] = [0; 60];
-
-        for report in reports
-            .iter()
-            .filter(|report| report.guard_id == sleepiest_guard_id)
-        {
-            for (min, &asleep) in report.asleep_minutes.iter().enumerate() {
-                if asleep {
-                    histogram[min] += 1
-                }
-            }
-        }
-
-        let sleepiest_minute = histogram
-            .iter()
-            .enumerate()
-            .max_by_key(|(_minute, &asleep_count)| asleep_count)
-            .unwrap()
-            .0;
+        let sleepiest_minute = sleepiest_guard.sleepiest_minute();
         assert_eq!(sleepiest_minute, 25);
 
-        let final_result = sleepiest_minute * sleepiest_guard_id as usize;
+        let final_result = sleepiest_minute * sleepiest_guard.guard_id as usize;
         assert_eq!(final_result, 19025);
     }
 
