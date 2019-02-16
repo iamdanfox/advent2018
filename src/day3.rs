@@ -1,12 +1,18 @@
 #[cfg(test)]
 mod test {
     use itertools::Itertools;
+    use multiset::HashMultiSet;
     use regex::Regex;
     use std::fs;
     use std::num::ParseIntError;
     use std::str::FromStr;
 
     type Square = (usize, usize);
+
+    #[test]
+    fn part1() {
+        assert_eq!(Claim::count_overlapping_squares(input()), 117505);
+    }
 
     #[derive(Debug, PartialEq)]
     struct Claim {
@@ -18,14 +24,23 @@ mod test {
     }
 
     impl Claim {
-        fn squares(&self) -> impl Iterator<Item=Square> {
+        fn squares(&self) -> impl Iterator<Item = Square> {
             let xs = self.offset_left..(self.offset_left + self.width);
             let ys = self.offset_top..(self.offset_top + self.height);
             xs.cartesian_product(ys)
         }
 
-        fn size(&self) -> usize {
-            self.width * self.height
+        fn count_overlapping_squares(claims: Vec<Claim>) -> usize {
+            let squares: HashMultiSet<Square> = claims.iter().flat_map(Claim::squares).collect();
+
+            let mut overlaps = 0;
+            for square in squares.distinct_elements() {
+                if squares.count_of(square) > 1 {
+                    overlaps += 1;
+                }
+            }
+
+            overlaps
         }
     }
 
@@ -69,22 +84,19 @@ mod test {
 
     #[test]
     fn to_square_produces_one_tuple_for_every_square_in_claim() {
-        let squares: Vec<Square> = Claim::from_str("#123 @ 3,2: 5x4").unwrap().squares().collect();
+        let squares: Vec<Square> = Claim::from_str("#123 @ 3,2: 5x4")
+            .unwrap()
+            .squares()
+            .collect();
         assert_eq!(squares.len(), 5 * 4);
     }
 
     #[test]
-    fn find_overlap_of_two_claims() {
+    fn find_overlap_of_three_claims() {
         let c1 = Claim::from_str("#123 @ 0,0: 1x1").unwrap();
-        let c2 = Claim::from_str("#123 @ 0,0: 2x2").unwrap();
-
-        let count_squares = c1.size() + c2.size();
-        let unique_squares = c1.squares().chain(c2.squares()).unique().count();
-        let overlap = count_squares - unique_squares;
-
-        assert_eq!(count_squares, 5);
-        assert_eq!(unique_squares, 4);
-        assert_eq!(overlap, 1);
+        let c2 = Claim::from_str("#124 @ 0,0: 1x1").unwrap();
+        let c3 = Claim::from_str("#125 @ 0,0: 2x2").unwrap();
+        assert_eq!(Claim::count_overlapping_squares(vec![c1, c2, c3]), 1);
     }
 
     fn input() -> Vec<Claim> {
