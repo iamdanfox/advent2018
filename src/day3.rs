@@ -6,12 +6,13 @@ mod test {
     use std::fs;
     use std::num::ParseIntError;
     use std::str::FromStr;
+    use std::collections::HashSet;
 
     type Square = (usize, usize);
 
     #[test]
     fn part1() {
-        assert_eq!(Claim::count_overlapping_squares(input()), 117505);
+        assert_eq!(Claim::contended_squares(input()).len(), 117505);
     }
 
     #[derive(Debug, PartialEq)]
@@ -30,17 +31,18 @@ mod test {
             xs.cartesian_product(ys)
         }
 
-        fn count_overlapping_squares(claims: Vec<Claim>) -> usize {
+        fn contended_squares(claims: Vec<Claim>) -> HashSet<Square> {
             let squares: HashMultiSet<Square> = claims.iter().flat_map(Claim::squares).collect();
 
-            let mut overlaps = 0;
+            let mut contended = HashSet::new();
+
             for square in squares.distinct_elements() {
                 if squares.count_of(square) > 1 {
-                    overlaps += 1;
+                    contended.insert(*square);
                 }
             }
 
-            overlaps
+            contended
         }
     }
 
@@ -96,7 +98,7 @@ mod test {
         let c1 = Claim::from_str("#123 @ 0,0: 1x1").unwrap();
         let c2 = Claim::from_str("#124 @ 0,0: 1x1").unwrap();
         let c3 = Claim::from_str("#125 @ 0,0: 2x2").unwrap();
-        assert_eq!(Claim::count_overlapping_squares(vec![c1, c2, c3]), 1);
+        assert_eq!(Claim::contended_squares(vec![c1, c2, c3]).len(), 1);
     }
 
     fn input() -> Vec<Claim> {
