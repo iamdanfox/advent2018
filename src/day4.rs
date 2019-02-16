@@ -75,6 +75,12 @@ mod test {
         pub asleep_minutes: Vec<SleepReport>,
     }
 
+    impl GuardReport {
+        fn total_minutes_asleep(&self) -> usize {
+            self.asleep_minutes.iter().map(|r| r.count()).sum()
+        }
+    }
+
     fn guard_sleep_reports(entries: &[LogEntry]) -> Vec<GuardShiftReport> {
         let mut result = vec![];
 
@@ -175,23 +181,19 @@ mod test {
 
         let worst_guard = &reports_by_guard_id
             .iter()
-            .map(|(&guard, vec)| -> (GuardId, usize) {
-//                GuardReport {
-//                    guard_id,
-//                    asleep_minutes: vec.iter().map(|report| report.asleep_minutes).collect()
-//                }
-                (
-                    guard,
-                    vec.iter().map(|report| report.asleep_minutes.count()).sum(),
-                )
+            .map(|(&guard, vec)| -> GuardReport {
+                GuardReport {
+                    guard_id: guard,
+                    asleep_minutes: vec.iter().map(|report| report.asleep_minutes).collect()
+                }
             })
             .collect_vec();
 
         let sleepiest_guard_id: GuardId = worst_guard
             .iter()
-            .max_by_key(|(_guard, mins_asleep)| mins_asleep)
+            .max_by_key(|report| report.total_minutes_asleep())
             .unwrap()
-            .0;
+            .guard_id;
 
         assert_eq!(sleepiest_guard_id, 761);
 
