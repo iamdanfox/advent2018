@@ -60,18 +60,34 @@ mod day1 {
 #[cfg(test)]
 mod day2 {
     use std::fs;
+    use std::iter::FromIterator;
+
+    #[test]
+    fn part1() {
+        let checksum: Checksum = fs::read_to_string("day2.txt")
+            .unwrap()
+            .lines()
+            .map(ChecksumEntry::from)
+            .collect();
+        assert_eq!(checksum, Checksum(5928));
+    }
 
     #[derive(Debug, PartialEq)]
     struct Checksum(u64);
 
-    fn checksum(entries: &[ChecksumEntry]) -> Checksum {
-        let mut twos: u64 = 0;
-        let mut threes: u64 = 0;
-        for &entry in entries {
-            twos += if entry.exactly_2_of_any { 1 } else { 0 };
-            threes += if entry.exactly_3_of_any { 1 } else { 0 };
+    impl FromIterator<ChecksumEntry> for Checksum {
+        fn from_iter<I>(iter: I) -> Self
+        where
+            I: IntoIterator<Item = ChecksumEntry>,
+        {
+            let mut twos: u64 = 0;
+            let mut threes: u64 = 0;
+            for entry in iter {
+                twos += if entry.exactly_2_of_any { 1 } else { 0 };
+                threes += if entry.exactly_3_of_any { 1 } else { 0 };
+            }
+            Checksum(twos * threes)
         }
-        Checksum(twos * threes)
     }
 
     #[derive(Debug, PartialEq, Copy, Clone)]
@@ -136,20 +152,10 @@ mod day2 {
         let input = [
             "abcdef", "bababc", "abbcde", "abcccd", "aabcdd", "abcdee", "ababab",
         ];
-        let foo: Vec<ChecksumEntry> = input
+        let foo: Checksum = input
             .iter()
             .map(|&line| ChecksumEntry::from(line))
             .collect();
-        assert_eq!(checksum(&foo), Checksum(12));
-    }
-
-    #[test]
-    fn run_input() {
-        let entries: Vec<ChecksumEntry> = fs::read_to_string("day2.txt")
-            .unwrap()
-            .lines()
-            .map(ChecksumEntry::from)
-            .collect();
-        assert_eq!(checksum(&entries), Checksum(5928));
+        assert_eq!(foo, Checksum(12));
     }
 }
