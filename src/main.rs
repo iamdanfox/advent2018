@@ -54,3 +54,65 @@ mod day1 {
         None
     }
 }
+
+#[cfg(test)]
+mod day2 {
+    #[derive(Debug, PartialEq)]
+    struct Checksum(u8);
+
+    fn checksum(entries: &[ChecksumEntry]) -> Checksum {
+        let mut twos: u8 = 0;
+        let mut threes: u8 = 0;
+        for &entry in entries {
+            twos += if entry.exactly_2_of_any { 1 } else { 0 };
+            threes += if entry.exactly_3_of_any { 1 } else { 0 };
+        }
+        Checksum(twos * threes)
+    }
+
+    #[derive(Debug, PartialEq, Copy, Clone)]
+    struct ChecksumEntry {
+        pub exactly_2_of_any: bool,
+        pub exactly_3_of_any: bool,
+    }
+
+    impl From<&str> for ChecksumEntry {
+        fn from(string: &str) -> Self {
+            let mut char_counts: [u8; 256] = [0; 256];
+
+            for &byte in string.as_bytes() {
+                let index: usize = byte as usize;
+                char_counts[index] += 1
+            }
+
+            let mut two = false;
+            let mut three = false;
+
+            for &count in char_counts.iter() {
+                if two && three {
+                    break;
+                }
+                match count {
+                    2 => two = true,
+                    3 => three = true,
+                    _ => {}
+                }
+            }
+            ChecksumEntry { exactly_2_of_any: two, exactly_3_of_any: three }
+        }
+    }
+
+    #[test]
+    fn sample_testcases() {
+        assert_eq!(ChecksumEntry::from("abcdef"), ChecksumEntry { exactly_2_of_any: false, exactly_3_of_any: false });
+        assert_eq!(ChecksumEntry::from("bababc"), ChecksumEntry { exactly_2_of_any: true, exactly_3_of_any: true });
+        assert_eq!(ChecksumEntry::from("abbcde"), ChecksumEntry { exactly_2_of_any: true, exactly_3_of_any: false });
+    }
+
+    #[test]
+    fn sample_testcases_2() {
+        let input = ["abcdef", "bababc", "abbcde", "abcccd", "aabcdd", "abcdee", "ababab"];
+        let foo: Vec<ChecksumEntry> = input.iter().map(|&line| ChecksumEntry::from(line)).collect();
+        assert_eq!(checksum(&foo), Checksum(12));
+    }
+}
