@@ -12,6 +12,8 @@ mod test {
     use std::option::Option::Some;
     use std::str::FromStr;
 
+    type GuardId = u32;
+
     #[derive(Debug, Eq, PartialEq)]
     struct LogEntry {
         pub datetime: NaiveDateTime,
@@ -20,13 +22,13 @@ mod test {
 
     #[derive(Debug, Eq, PartialEq)]
     enum Event {
-        GuardBeginsShift(u32),
+        GuardBeginsShift(GuardId),
         FallsAsleep,
         WakesUp,
     }
 
     struct GuardSleepReport {
-        pub id: u32,
+        pub guard_id: GuardId,
         /// minutes spent asleep during the midnight hour
         pub asleep_minutes: [bool; 60],
     }
@@ -40,7 +42,7 @@ mod test {
     impl Debug for GuardSleepReport {
         fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
             f.write_char('#')?;
-            self.id.fmt(f)?;
+            self.guard_id.fmt(f)?;
             f.write_str(": ")?;
             for &asleep in self.asleep_minutes.iter() {
                 f.write_char(if asleep { '#' } else { '.' })?;
@@ -64,7 +66,7 @@ mod test {
                     assert_eq!(asleep_since, None);
                     if let Some(prev_guard_id) = guard_id {
                         result.push(GuardSleepReport {
-                            id: prev_guard_id,
+                            guard_id: prev_guard_id,
                             asleep_minutes,
                         });
                         asleep_minutes = [false; 60];
@@ -87,7 +89,7 @@ mod test {
 
         if let Some(prev_guard_id) = guard_id {
             result.push(GuardSleepReport {
-                id: prev_guard_id,
+                guard_id: prev_guard_id,
                 asleep_minutes,
             });
         }
@@ -141,8 +143,26 @@ mod test {
             .map(|line| LogEntry::from_str(line).unwrap())
             .sorted_by_key(|entry| entry.datetime)
             .collect();
+        let reports = guard_sleep_reports(&log);
 
-        dbg!(guard_sleep_reports(&log));
+        let worst_guard_leaderboard: Vec<(GuardId, usize)> = reports.iter()
+            .sorted_by_key(|report| report.guard_id)
+            .map(|report| (report.guard_id, report.minutes_spent_asleep()))
+            .coalesce(|prev, curr| {
+                if prev.0 == curr.0 {
+                    Ok((prev.0, prev.1 + curr.1))
+                } else {
+                    Err((prev, curr))
+                }
+            })
+            .sorted_by_key(|pair| pair.1)
+            .collect();
+
+        let worst_guard: &(GuardId, usize) = worst_guard_leaderboard.iter()
+            .max_by_key(|&pair| pair.1)
+            .unwrap();
+
+        assert_eq!(worst_guard.0, 761); // this is the guard with most minutes spent asleep
     }
 
     #[test]
