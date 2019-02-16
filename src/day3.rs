@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod test {
     use regex::Regex;
+    use std::fs;
+    use std::num::ParseIntError;
     use std::str::FromStr;
 
     #[derive(Debug, PartialEq)]
@@ -13,7 +15,7 @@ mod test {
     }
 
     impl FromStr for Claim {
-        type Err = ();
+        type Err = ParseIntError;
 
         fn from_str(line: &str) -> Result<Self, Self::Err> {
             lazy_static! {
@@ -22,21 +24,11 @@ mod test {
             let captures = re.captures(line).unwrap();
 
             Ok(Claim {
-                id: captures.name("id").unwrap().as_str().parse().unwrap(),
-                offset_left: captures
-                    .name("offset_left")
-                    .unwrap()
-                    .as_str()
-                    .parse()
-                    .unwrap(),
-                offset_top: captures
-                    .name("offset_top")
-                    .unwrap()
-                    .as_str()
-                    .parse()
-                    .unwrap(),
-                width: captures.name("width").unwrap().as_str().parse().unwrap(),
-                height: captures.name("height").unwrap().as_str().parse().unwrap(),
+                id: captures.name("id").unwrap().as_str().parse()?,
+                offset_left: captures.name("offset_left").unwrap().as_str().parse()?,
+                offset_top: captures.name("offset_top").unwrap().as_str().parse()?,
+                width: captures.name("width").unwrap().as_str().parse()?,
+                height: captures.name("height").unwrap().as_str().parse()?,
             })
         }
     }
@@ -53,5 +45,18 @@ mod test {
                 height: 4
             }
         )
+    }
+
+    #[test]
+    fn parses_entire_input() {
+        assert_eq!(input().len(), 1381);
+    }
+
+    fn input() -> Vec<Claim> {
+        fs::read_to_string("day3.txt")
+            .unwrap()
+            .lines()
+            .map(|l| l.parse().unwrap())
+            .collect()
     }
 }
