@@ -13,6 +13,50 @@ mod test {
     use std::slice::Iter;
     use std::str::FromStr;
 
+    #[test]
+    fn part1() {
+        let guard_reports = guard_reports();
+
+        let sleepiest_guard: &GuardReport = guard_reports
+            .iter()
+            .max_by_key(|report| report.total_minutes_asleep())
+            .unwrap();
+        assert_eq!(sleepiest_guard.guard_id, 761);
+
+        let sleepiest_minute = sleepiest_guard.sleepiest_minute();
+        assert_eq!(sleepiest_minute, 25);
+
+        let final_result = sleepiest_minute * sleepiest_guard.guard_id as usize;
+        assert_eq!(final_result, 19025);
+    }
+
+    #[test]
+    fn part2() {
+        let guard_reports = guard_reports()
+            .iter()
+            .map(|r| {
+                let (minute, &count) = r
+                    .cumulative_sleep_histogram()
+                    .iter()
+                    .enumerate()
+                    .max_by_key(|(_, &count)| count)
+                    .unwrap();
+                (r.guard_id, minute, count)
+            })
+            .collect_vec();
+
+        let (id, minute, count) = guard_reports
+            .iter()
+            .max_by_key(|(_, _, count)| count)
+            .unwrap();
+        assert_eq!(*id, 743);
+        assert_eq!(*minute, 32);
+        assert_eq!(*count, 15);
+
+        let final_answer = *id as usize * minute;
+        assert_eq!(final_answer, 23776);
+    }
+
     type GuardId = u32;
 
     #[derive(Debug, Eq, PartialEq)]
@@ -102,19 +146,9 @@ mod test {
                 .unwrap()
                 .0
         }
-//
-//        pub fn sleep_likelihood(&self) -> [f32; 60] {
-//            let mut likelihood = [0f32; 60];
-//            let num_reports = self.reports.len() as f32;
-//            let histogram = self.cumulative_sleep_histogram();
-//            for (index, &count) in histogram.iter().enumerate() {
-//                likelihood[index] = count as f32 / num_reports;
-//            }
-//            likelihood
-//        }
     }
 
-    fn guard_sleep_reports(entries: &[LogEntry]) -> Vec<GuardShiftReport> {
+    fn guard_shift_reports(entries: &[LogEntry]) -> Vec<GuardShiftReport> {
         let mut result = vec![];
 
         let mut guard_id = None;
@@ -197,17 +231,15 @@ mod test {
         }
     }
 
-    #[test]
-    fn input() {
+    fn guard_reports() -> Vec<GuardReport> {
         let log: Vec<LogEntry> = fs::read_to_string("day4.txt")
             .unwrap()
             .lines()
             .map(|line| LogEntry::from_str(line).unwrap())
             .sorted_by_key(|entry| entry.datetime)
             .collect();
-        let reports = guard_sleep_reports(&log);
 
-        let guard_reports: Vec<GuardReport> = reports
+        guard_shift_reports(&log)
             .iter()
             .map(|report| (report.guard_id, report))
             .into_group_map()
@@ -215,25 +247,10 @@ mod test {
             .map(|(&guard, vec)| -> GuardReport {
                 GuardReport {
                     guard_id: guard,
-                    reports: vec.iter().map(|report| report.asleep_minutes).collect()
+                    reports: vec.iter().map(|report| report.asleep_minutes).collect(),
                 }
             })
-            .collect_vec();
-
-        dbg!(&guard_reports);
-
-        let sleepiest_guard: &GuardReport = guard_reports
-            .iter()
-            .max_by_key(|report| report.total_minutes_asleep())
-            .unwrap();
-
-        assert_eq!(sleepiest_guard.guard_id, 761);
-
-        let sleepiest_minute = sleepiest_guard.sleepiest_minute();
-        assert_eq!(sleepiest_minute, 25);
-
-        let final_result = sleepiest_minute * sleepiest_guard.guard_id as usize;
-        assert_eq!(final_result, 19025);
+            .collect_vec()
     }
 
     #[test]
@@ -264,7 +281,7 @@ mod test {
             .sorted_by_key(|entry| entry.datetime)
             .collect();
 
-        let string = guard_sleep_reports(&log)
+        let string = guard_shift_reports(&log)
             .iter()
             .map(|report| format!("{:?}", report))
             .join("\n");
