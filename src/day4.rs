@@ -145,7 +145,8 @@ mod test {
             .collect();
         let reports = guard_sleep_reports(&log);
 
-        let worst_guard_leaderboard: Vec<(GuardId, usize)> = reports.iter()
+        let worst_guard_leaderboard: Vec<(GuardId, usize)> = reports
+            .iter()
             .sorted_by_key(|report| report.guard_id)
             .map(|report| (report.guard_id, report.minutes_spent_asleep()))
             .coalesce(|prev, curr| {
@@ -158,11 +159,37 @@ mod test {
             .sorted_by_key(|pair| pair.1)
             .collect();
 
-        let worst_guard: &(GuardId, usize) = worst_guard_leaderboard.iter()
+        let worst_guard: &(GuardId, usize) = worst_guard_leaderboard
+            .iter()
             .max_by_key(|&pair| pair.1)
             .unwrap();
 
-        assert_eq!(worst_guard.0, 761); // this is the guard with most minutes spent asleep
+        let sleepiest_guard_id: GuardId = worst_guard.0;
+        assert_eq!(sleepiest_guard_id, 761); // this is the guard with most minutes spent asleep
+
+        let mut aggregate_asleep_minutes: [u32; 60] = [0; 60];
+
+        for report in reports
+            .iter()
+            .filter(|report| report.guard_id == sleepiest_guard_id)
+        {
+            for (min, &asleep) in report.asleep_minutes.iter().enumerate() {
+                if asleep {
+                    aggregate_asleep_minutes[min] += 1
+                }
+            }
+        }
+
+        let sleepiest_minute = aggregate_asleep_minutes
+            .iter()
+            .enumerate()
+            .max_by_key(|(_minute, &asleep_count)| asleep_count)
+            .unwrap()
+            .0;
+        assert_eq!(sleepiest_minute, 25);
+
+        let final_result = sleepiest_minute * sleepiest_guard_id as usize;
+        assert_eq!(final_result, 19025);
     }
 
     #[test]
