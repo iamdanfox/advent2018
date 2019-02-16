@@ -1,17 +1,32 @@
 #[cfg(test)]
 mod test {
+    use itertools::Itertools;
     use regex::Regex;
     use std::fs;
     use std::num::ParseIntError;
     use std::str::FromStr;
 
+    type Square = (usize, usize);
+
     #[derive(Debug, PartialEq)]
     struct Claim {
-        id: u32,
-        offset_left: u32,
-        offset_top: u32,
-        width: u32,
-        height: u32,
+        id: usize,
+        offset_left: usize,
+        offset_top: usize,
+        width: usize,
+        height: usize,
+    }
+
+    impl Claim {
+        fn squares(&self) -> impl Iterator<Item=Square> {
+            let xs = self.offset_left..(self.offset_left + self.width);
+            let ys = self.offset_top..(self.offset_top + self.height);
+            xs.cartesian_product(ys)
+        }
+
+        fn size(&self) -> usize {
+            self.width * self.height
+        }
     }
 
     impl FromStr for Claim {
@@ -42,7 +57,7 @@ mod test {
                 offset_left: 3,
                 offset_top: 2,
                 width: 5,
-                height: 4
+                height: 4,
             }
         )
     }
@@ -50,6 +65,26 @@ mod test {
     #[test]
     fn parses_entire_input() {
         assert_eq!(input().len(), 1381);
+    }
+
+    #[test]
+    fn to_square_produces_one_tuple_for_every_square_in_claim() {
+        let squares: Vec<Square> = Claim::from_str("#123 @ 3,2: 5x4").unwrap().squares().collect();
+        assert_eq!(squares.len(), 5 * 4);
+    }
+
+    #[test]
+    fn find_overlap_of_two_claims() {
+        let c1 = Claim::from_str("#123 @ 0,0: 1x1").unwrap();
+        let c2 = Claim::from_str("#123 @ 0,0: 2x2").unwrap();
+
+        let count_squares = c1.size() + c2.size();
+        let unique_squares = c1.squares().chain(c2.squares()).unique().count();
+        let overlap = count_squares - unique_squares;
+
+        assert_eq!(count_squares, 5);
+        assert_eq!(unique_squares, 4);
+        assert_eq!(overlap, 1);
     }
 
     fn input() -> Vec<Claim> {
