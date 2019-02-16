@@ -22,7 +22,7 @@ mod test {
     enum Event {
         GuardBeginsShift(u32),
         FallsAsleep,
-        WakesUp
+        WakesUp,
     }
 
     struct GuardSleepReport {
@@ -54,6 +54,7 @@ mod test {
             let current_time = entry.datetime.time().minute() as usize;
             match entry.event {
                 Event::GuardBeginsShift(id) => {
+                    assert_eq!(asleep_since, None);
                     if let Some(prev_guard_id) = guard_id {
                         result.push(GuardSleepReport {
                             id: prev_guard_id,
@@ -63,19 +64,25 @@ mod test {
                     }
 
                     guard_id = Some(id);
-                    // TODO can a guard handover when the last is asleep?
-                },
+                }
                 Event::FallsAsleep => {
                     assert_eq!(asleep_since, None);
                     asleep_since = Some(current_time);
-                },
+                }
                 Event::WakesUp => {
                     for minute in asleep_since.unwrap()..current_time {
                         asleep_minutes[minute] = true;
                     }
                     asleep_since = None
-                },
+                }
             }
+        }
+
+        if let Some(prev_guard_id) = guard_id {
+            result.push(GuardSleepReport {
+                id: prev_guard_id,
+                asleep_minutes,
+            });
         }
 
         result
@@ -86,12 +93,13 @@ mod test {
 
         fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
             if s == "falls asleep" {
-                return Ok(Event::FallsAsleep)
+                return Ok(Event::FallsAsleep);
             } else if s == "wakes up" {
-                return Ok(Event::WakesUp)
+                return Ok(Event::WakesUp);
             } else {
                 lazy_static! {
-                    static ref re: Regex = Regex::new(r"^Guard #(?P<id>\d+) begins shift$").unwrap();
+                    static ref re: Regex =
+                        Regex::new(r"^Guard #(?P<id>\d+) begins shift$").unwrap();
                 }
                 let captures = re.captures(s).unwrap();
                 let id: u32 = captures.name("id").unwrap().as_str().parse().unwrap();
@@ -120,12 +128,54 @@ mod test {
 
     #[test]
     fn input() {
-        let log: Vec<LogEntry> = fs::read_to_string("day4.txt").unwrap().lines()
+        let log: Vec<LogEntry> = fs::read_to_string("day4.txt")
+            .unwrap()
+            .lines()
             .map(|line| LogEntry::from_str(line).unwrap())
             .sorted_by_key(|entry| entry.datetime)
             .collect();
 
-
         dbg!(guard_sleep_reports(&log));
+    }
+
+    #[test]
+    fn example_input() {
+        let sample = r#"
+[1518-11-01 00:00] Guard #10 begins shift
+[1518-11-01 00:05] falls asleep
+[1518-11-01 00:25] wakes up
+[1518-11-01 00:30] falls asleep
+[1518-11-01 00:55] wakes up
+[1518-11-01 23:58] Guard #99 begins shift
+[1518-11-02 00:40] falls asleep
+[1518-11-02 00:50] wakes up
+[1518-11-03 00:05] Guard #10 begins shift
+[1518-11-03 00:24] falls asleep
+[1518-11-03 00:29] wakes up
+[1518-11-04 00:02] Guard #99 begins shift
+[1518-11-04 00:36] falls asleep
+[1518-11-04 00:46] wakes up
+[1518-11-05 00:03] Guard #88 begins shift
+[1518-11-05 00:45] falls asleep
+[1518-11-05 00:55] wakes up
+"#;
+        let log: Vec<LogEntry> = sample
+            .trim()
+            .lines()
+            .map(|line| LogEntry::from_str(line).unwrap())
+            .sorted_by_key(|entry| entry.datetime)
+            .collect();
+
+        let string = guard_sleep_reports(&log)
+            .iter()
+            .map(|report| format!("{:?}", report))
+            .join("\n");
+        let expected = r#"
+#10: .....####################.....#########################.....
+#99: ........................................##########..........
+#10: ........................#####...............................
+#99: ....................................##########..............
+#88: .............................................##########....."#;
+        assert_eq!(string, expected.trim());
     }
 }
