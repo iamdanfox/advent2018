@@ -11,6 +11,7 @@ mod test {
     use std::fmt::Formatter;
     use std::fs;
     use std::option::Option::Some;
+    use std::slice::Iter;
     use std::str::FromStr;
 
     type GuardId = u32;
@@ -29,16 +30,33 @@ mod test {
     }
 
     #[derive(Copy, Clone)]
+    pub struct SleepReport([bool; 60]);
+
+    impl SleepReport {
+        // TODO(dfox): try IntoIter instead?
+        pub fn iter(&self) -> Iter<bool> {
+            self.0.iter()
+        }
+
+        pub fn count(&self) -> usize {
+            self.0.iter().filter(|&&b| b).count()
+        }
+    }
+
+    impl Debug for SleepReport {
+        fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+            for &asleep in self.0.iter() {
+                f.write_char(if asleep { '#' } else { '.' })?;
+            }
+            Ok(())
+        }
+    }
+
+    #[derive(Copy, Clone)]
     struct GuardShiftReport {
         pub guard_id: GuardId,
         /// minutes spent asleep during the midnight hour
-        pub asleep_minutes: [bool; 60],
-    }
-
-    impl GuardShiftReport {
-        pub fn minutes_spent_asleep(&self) -> usize {
-            self.asleep_minutes.iter().filter(|&&b| b).count()
-        }
+        pub asleep_minutes: SleepReport,
     }
 
     impl Debug for GuardShiftReport {
@@ -46,12 +64,15 @@ mod test {
             f.write_char('#')?;
             self.guard_id.fmt(f)?;
             f.write_str(": ")?;
-            for &asleep in self.asleep_minutes.iter() {
-                f.write_char(if asleep { '#' } else { '.' })?;
-            }
-            self.minutes_spent_asleep().fmt(f)?;
+            self.asleep_minutes.fmt(f)?;
+            self.asleep_minutes.count().fmt(f)?;
             Ok(())
         }
+    }
+
+    struct GuardReport {
+        pub guard_id: GuardId,
+        pub asleep_minutes: Vec<SleepReport>,
     }
 
     fn guard_sleep_reports(entries: &[LogEntry]) -> Vec<GuardShiftReport> {
@@ -69,7 +90,7 @@ mod test {
                     if let Some(prev_guard_id) = guard_id {
                         result.push(GuardShiftReport {
                             guard_id: prev_guard_id,
-                            asleep_minutes,
+                            asleep_minutes: SleepReport(asleep_minutes),
                         });
                         asleep_minutes = [false; 60];
                     }
@@ -92,7 +113,7 @@ mod test {
         if let Some(prev_guard_id) = guard_id {
             result.push(GuardShiftReport {
                 guard_id: prev_guard_id,
-                asleep_minutes,
+                asleep_minutes: SleepReport(asleep_minutes),
             });
         }
 
@@ -155,9 +176,13 @@ mod test {
         let worst_guard = &reports_by_guard_id
             .iter()
             .map(|(&guard, vec)| -> (GuardId, usize) {
+//                GuardReport {
+//                    guard_id,
+//                    asleep_minutes: vec.iter().map(|report| report.asleep_minutes).collect()
+//                }
                 (
                     guard,
-                    vec.iter().map(|report| report.minutes_spent_asleep()).sum(),
+                    vec.iter().map(|report| report.asleep_minutes.count()).sum(),
                 )
             })
             .collect_vec();
@@ -170,7 +195,7 @@ mod test {
 
         assert_eq!(sleepiest_guard_id, 761);
 
-        let mut aggregate_asleep_minutes: [u32; 60] = [0; 60];
+        let mut histogram: [u32; 60] = [0; 60];
 
         for report in reports
             .iter()
@@ -178,12 +203,12 @@ mod test {
         {
             for (min, &asleep) in report.asleep_minutes.iter().enumerate() {
                 if asleep {
-                    aggregate_asleep_minutes[min] += 1
+                    histogram[min] += 1
                 }
             }
         }
 
-        let sleepiest_minute = aggregate_asleep_minutes
+        let sleepiest_minute = histogram
             .iter()
             .enumerate()
             .max_by_key(|(_minute, &asleep_count)| asleep_count)
