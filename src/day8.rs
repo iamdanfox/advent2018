@@ -1,9 +1,18 @@
 #[cfg(test)]
 mod test {
     use itertools::Itertools;
+    use std::fs;
 
     #[test]
-    fn samples() {
+    fn real_data() {
+        let string = fs::read_to_string("day8.txt").unwrap();
+        let node = &parse_input(&string)[0];
+        dbg!(&node);
+        assert_eq!(sum_metadata(node), 37905);
+    }
+
+    #[test]
+    fn sample_data() {
         let input = "2 3 0 3 10 11 12 1 1 0 1 99 2 1 1 2";
         let node = &parse_input(input)[0];
 
