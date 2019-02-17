@@ -7,8 +7,9 @@ mod test {
     fn real_data() {
         let string = fs::read_to_string("day8.txt").unwrap();
         let node = &parse_input(&string)[0];
-        dbg!(&node);
+
         assert_eq!(sum_metadata(node), 37905);
+        assert_eq!(value_of_node(node), 33891);
     }
 
     #[test]
@@ -17,14 +18,32 @@ mod test {
         let node = &parse_input(input)[0];
 
         assert_eq!(sum_metadata(node), 138);
+        assert_eq!(value_of_node(node), 66);
+    }
+
+    fn value_of_node(l: &LicenseNode) -> usize {
+        if l.children.is_empty() {
+            return sum_metadata(l);
+        }
+
+        let mut sum = 0;
+        for &index in &l.metadata {
+            if let Some(child_node) = l.children.get(index - 1) {
+                sum += value_of_node(&child_node);
+            }
+        }
+
+        sum
     }
 
     fn sum_metadata(l: &LicenseNode) -> usize {
-        l.metadata.iter().sum::<usize>()
-            + l.children
-                .iter()
-                .map(|child| sum_metadata(child))
-                .sum::<usize>()
+        let own = l.metadata.iter().sum::<usize>();
+        let children = l
+            .children
+            .iter()
+            .map(|child| sum_metadata(child))
+            .sum::<usize>();
+        own + children
     }
 
     fn parse_input(input: &str) -> Vec<LicenseNode> {
