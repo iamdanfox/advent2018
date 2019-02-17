@@ -9,19 +9,28 @@ mod test {
 
     #[test]
     fn example() {
-        let dependencies = sample_input();
-        let ids = step_ids(&dependencies);
+        let input = sample_input();
+        assert_eq!(solve_part1(&input), 'E');
+    }
 
+    #[test]
+    fn real_data() {
+        let input = real_input();
+        assert_eq!(solve_part1(&input), 'Q');
+    }
+
+    fn solve_part1(dependencies: &[Dependency]) -> char {
+        let ids = step_ids(&dependencies);
         // Step A (key) requires C (values) to be complete
-        let mut back_edges = new_edge_map(&ids);
-        for dep in &dependencies {
-            back_edges.entry(dep.step).or_default().push(dep.prereq);
-        }
-        dbg!(back_edges);
+//        let mut back_edges = new_edge_map(&ids);
+//        for dep in dependencies {
+//            back_edges.entry(dep.step).or_default().push(dep.prereq);
+//        }
+//        dbg!(back_edges);
 
         // Step A (key) is prereq of B, D (values)
         let mut forward_edges = new_edge_map(&ids);
-        for dep in &dependencies {
+        for dep in dependencies {
             forward_edges.entry(dep.prereq).or_default().push(dep.step);
         }
         dbg!(&forward_edges);
@@ -32,8 +41,7 @@ mod test {
             .next()
             .expect("No step found with zero prereqs")
             .0;
-
-        assert_eq!(starting_node, 'E');
+        starting_node
     }
 
     // ensures all node ids appear
