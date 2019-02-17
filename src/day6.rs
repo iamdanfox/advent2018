@@ -10,12 +10,14 @@ mod test {
     fn example() {
         let input = vec![(1, 1), (1, 6), (8, 3), (3, 4), (5, 5), (8, 9)];
         assert_eq!(solve_part1(&input), 17);
+        assert_eq!(solve_part2(&input, 32), 16);
     }
 
     #[test]
-    fn part1() {
+    fn real_data() {
         let input = input();
         assert_eq!(solve_part1(&input), 3620);
+        assert_eq!(solve_part2(&input, 10_000), 39930);
     }
 
     fn solve_part1(input: &[Point]) -> usize {
@@ -33,6 +35,23 @@ mod test {
             .max_by_key(|(_, vec)| vec.len())
             .unwrap();
         owned.len()
+    }
+
+    fn solve_part2(input: &[Point], cutoff: u32) -> usize {
+        let grid = grid(input);
+
+        let mut safest_points = Vec::new();
+        for grid_point in grid {
+            let dist_to_all_points = input
+                .iter()
+                .map(|input| manhattan(&grid_point, input))
+                .sum::<u32>();
+            if dist_to_all_points < cutoff {
+                safest_points.push(grid_point);
+            }
+        }
+
+        safest_points.len()
     }
 
     fn grid(input: &[Point]) -> Vec<Point> {
