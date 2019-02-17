@@ -10,38 +10,53 @@ mod test {
     #[test]
     fn example() {
         let input = sample_input();
-        assert_eq!(solve_part1(&input), 'E');
+        assert_eq!(solve_part1(&input), "CABDFE".to_string());
     }
 
     #[test]
     fn real_data() {
         let input = real_input();
-        assert_eq!(solve_part1(&input), 'Q');
+        assert_eq!(solve_part1(&input), "BFKEGNOVATIHXYZRMCJDLSUPWQ");
     }
 
-    fn solve_part1(dependencies: &[Dependency]) -> char {
+    fn solve_part1(dependencies: &[Dependency]) -> String {
         let ids = step_ids(&dependencies);
+
         // Step A (key) requires C (values) to be complete
-//        let mut back_edges = new_edge_map(&ids);
-//        for dep in dependencies {
-//            back_edges.entry(dep.step).or_default().push(dep.prereq);
-//        }
-//        dbg!(back_edges);
+        let mut back_edges = new_edge_map(&ids);
+        for dep in dependencies {
+            back_edges.entry(dep.step).or_default().push(dep.prereq);
+        }
+        dbg!(&back_edges);
 
         // Step A (key) is prereq of B, D (values)
-        let mut forward_edges = new_edge_map(&ids);
-        for dep in dependencies {
-            forward_edges.entry(dep.prereq).or_default().push(dep.step);
-        }
-        dbg!(&forward_edges);
+        //        let mut forward_edges = new_edge_map(&ids);
+        //        for dep in dependencies {
+        //            forward_edges.entry(dep.prereq).or_default().push(dep.step);
+        //        }
+        //        dbg!(&forward_edges);
 
-        let starting_node = *forward_edges
-            .iter()
-            .filter(|(_node, prereqs)| prereqs.is_empty())
-            .next()
-            .expect("No step found with zero prereqs")
-            .0;
-        starting_node
+        let mut order = Vec::new();
+        while !back_edges.is_empty() {
+            let step = *back_edges
+                .iter()
+                .filter(|(_node, prereqs)| prereqs.is_empty())
+                .next()
+                .expect("No step found with zero prereqs")
+                .0;
+
+            dbg!(step);
+
+            order.push(step);
+            back_edges.remove(&step);
+            for (_, prereqs) in &mut back_edges {
+                prereqs.retain(|&prereq| prereq != step);
+            }
+
+            dbg!(back_edges.len());
+        }
+
+        order.iter().collect()
     }
 
     // ensures all node ids appear
