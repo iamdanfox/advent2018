@@ -3,6 +3,8 @@ mod test {
     use itertools::Itertools;
     use regex::Regex;
     use std::collections::BTreeMap;
+    use std::collections::HashMap;
+    use std::collections::HashSet;
     use std::fs;
     use std::io::Error;
     use std::str::FromStr;
@@ -11,6 +13,8 @@ mod test {
     fn example() {
         let input = sample_input();
         assert_eq!(solve_part1(&input), "CABDFE".to_string());
+
+        solve_part2(&input);
     }
 
     #[test]
@@ -27,14 +31,6 @@ mod test {
         for dep in dependencies {
             back_edges.entry(dep.step).or_default().push(dep.prereq);
         }
-        dbg!(&back_edges);
-
-        // Step A (key) is prereq of B, D (values)
-        //        let mut forward_edges = new_edge_map(&ids);
-        //        for dep in dependencies {
-        //            forward_edges.entry(dep.prereq).or_default().push(dep.step);
-        //        }
-        //        dbg!(&forward_edges);
 
         let mut order = Vec::new();
         while !back_edges.is_empty() {
@@ -45,18 +41,122 @@ mod test {
                 .expect("No step found with zero prereqs")
                 .0;
 
-            dbg!(step);
-
             order.push(step);
             back_edges.remove(&step);
+
             for (_, prereqs) in &mut back_edges {
                 prereqs.retain(|&prereq| prereq != step);
             }
-
-            dbg!(back_edges.len());
         }
 
         order.iter().collect()
+    }
+
+    fn solve_part2(dependencies: &[Dependency]) {
+        let ids = step_ids(&dependencies);
+
+        // Step A (key) requires C (values) to be complete
+        let mut back_edges = new_edge_map(&ids);
+        for dep in dependencies {
+            back_edges.entry(dep.step).or_default().push(dep.prereq);
+        }
+        dbg!(&back_edges);
+
+        let mut workers = WorkerPool::new(1);
+
+        while !back_edges.is_empty() {
+            while workers.available() {
+                let step = *back_edges
+                    .iter()
+                    .filter(|(_node, prereqs)| prereqs.is_empty())
+                    .next()
+                    .expect("No step found with zero prereqs")
+                    .0;
+
+                let duration = step_duration(step);
+                workers.begin_work(step, duration);
+
+                // remove from the graph so nobody else tries to start this work
+                back_edges.remove(&step);
+            }
+
+            dbg!(&workers);
+
+            if let Some(completed) = workers.tick() {
+                // unblock new tasks
+                for (_, prereqs) in &mut back_edges {
+                    prereqs.retain(|prereq| completed.contains(prereq));
+                }
+            }
+        }
+    }
+
+    fn step_duration(step: StepId) -> Time {
+//        (step as usize - 'A' as usize) + 61
+        (step as usize - 'A' as usize) + 1
+    }
+
+    #[ignore]
+    #[test]
+    fn test_step_duration() {
+        assert_eq!(step_duration('A'), 61);
+        assert_eq!(step_duration('B'), 62);
+        assert_eq!(step_duration('C'), 63);
+        assert_eq!(step_duration('Z'), 86);
+    }
+
+    type Time = usize;
+
+    #[derive(Debug)]
+    struct WorkerPool {
+        time: Time,
+        available_workers: u32,
+        // stores tasks and the clock time when they will be finished
+        in_progress: HashMap<StepId, Time>,
+    }
+
+    impl WorkerPool {
+        fn new(num_workers: u32) -> WorkerPool {
+            WorkerPool {
+                time: 0,
+                available_workers: num_workers,
+                in_progress: HashMap::new()
+            }
+        }
+
+        fn available(&self) -> bool {
+            self.available_workers > 0
+        }
+
+        fn begin_work(&mut self, step_id: StepId, duration: Time) {
+            assert!(self.available(), "tried to begin work but no worker available");
+            assert!(!self.in_progress.contains_key(&step_id), "Can't schedule work already running");
+            self.available_workers -= 1;
+            self.in_progress.insert(step_id, self.time + duration);
+        }
+
+        // advances the clock and and work that was completed (if any)
+        fn tick(&mut self) -> Option<HashSet<StepId>> {
+            self.time += 1;
+
+            // figure out which tasks have finished
+            let mut completed = HashSet::new();
+            for (&step, step_finished_time) in &self.in_progress {
+                if step_finished_time == &self.time {
+                    completed.insert(step);
+                }
+            }
+            if completed.is_empty() {
+                return None;
+            }
+
+            for step in &completed {
+                self.in_progress.remove(&step);
+            }
+
+            self.available_workers += completed.len() as u32;
+            Some(completed)
+        }
     }
 
     // ensures all node ids appear
