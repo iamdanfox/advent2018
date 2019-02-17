@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod test {
-    use regex::Regex;
-    use std::fs;
-    use std::str::FromStr;
-    use std::io::Error;
     use itertools::Itertools;
+    use regex::Regex;
     use std::collections::BTreeMap;
+    use std::fs;
+    use std::io::Error;
+    use std::str::FromStr;
 
     #[test]
     fn example() {
@@ -24,8 +24,16 @@ mod test {
         for dep in &dependencies {
             forward_edges.entry(dep.prereq).or_default().push(dep.step);
         }
-        dbg!(forward_edges);
+        dbg!(&forward_edges);
 
+        let starting_node = *forward_edges
+            .iter()
+            .filter(|(_node, prereqs)| prereqs.is_empty())
+            .next()
+            .expect("No step found with zero prereqs")
+            .0;
+
+        assert_eq!(starting_node, 'E');
     }
 
     // ensures all node ids appear
@@ -49,10 +57,13 @@ mod test {
         type Err = Box<Error>;
         fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
             lazy_static! {
-                static ref RE: Regex = Regex::new(r"^Step (.) must be finished before step (.) can begin.$").unwrap();
+                static ref RE: Regex =
+                    Regex::new(r"^Step (.) must be finished before step (.) can begin.$").unwrap();
             }
 
-            let captures = RE.captures(s).expect(&format!("Regex didn't match '{}'", &s));
+            let captures = RE
+                .captures(s)
+                .expect(&format!("Regex didn't match '{}'", &s));
             Ok(Dependency {
                 prereq: captures[1].chars().next().expect("Chars for prereq"),
                 step: captures[2].chars().next().expect("Chars for step"),
@@ -73,7 +84,8 @@ mod test {
             Dependency {
                 step: 'A',
                 prereq: 'C'
-            });
+            }
+        );
 
         assert_eq!(real_input().len(), 101);
     }
@@ -95,6 +107,9 @@ Step B must be finished before step E can begin.
 Step D must be finished before step E can begin.
 Step F must be finished before step E can begin.
 "#;
-        sample.lines().map(|l| Dependency::from_str(l).unwrap()).collect_vec()
+        sample
+            .lines()
+            .map(|l| Dependency::from_str(l).unwrap())
+            .collect_vec()
     }
 }
