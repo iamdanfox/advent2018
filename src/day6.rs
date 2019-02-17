@@ -8,35 +8,23 @@ mod test {
 
     #[test]
     fn example() {
-        let points = vec![(1, 1), (1, 6), (8, 3), (3, 4), (5, 5), (8, 9)];
-        assert_eq!(run(&points), 17);
+        let input = vec![(1, 1), (1, 6), (8, 3), (3, 4), (5, 5), (8, 9)];
+        assert_eq!(solve_part1(&input), 17);
     }
 
     #[test]
     fn part1() {
-        let points = input();
-        assert_eq!(run(&points), 3620);
+        let input = input();
+        assert_eq!(solve_part1(&input), 3620);
     }
 
-    fn run(points: &[Point]) -> usize {
-        // find bounds, to allow us to brute force
-        let (xs, ys): (Vec<u32>, Vec<u32>) = points.iter().cloned().unzip();
-        let range_x = *xs.iter().min().unwrap()..=*xs.iter().max().unwrap();
-        let range_y = *ys.iter().min().unwrap()..=*ys.iter().max().unwrap();
-        println!(
-            "Total points: {}, in the range {:?} to {:?}",
-            points.len(),
-            range_x,
-            range_y
-        );
-
-        // compute grid to exactly cover our input points
-        let grid: Vec<Point> = range_x.cartesian_product(range_y).collect_vec();
+    fn solve_part1(input: &[Point]) -> usize {
+        let grid = grid(input);
 
         // figure out who owns each grid point
         let mut owned_points: HashMap<Point, Vec<Point>> = HashMap::new();
         for grid_point in grid {
-            let owner = find_nearest(&grid_point, &points);
+            let owner = find_nearest(&grid_point, &input);
             owned_points.entry(owner).or_default().push(grid_point);
         }
 
@@ -45,6 +33,16 @@ mod test {
             .max_by_key(|(_, vec)| vec.len())
             .unwrap();
         owned.len()
+    }
+
+    fn grid(input: &[Point]) -> Vec<Point> {
+        // find bounds, to allow us to brute force
+        let (xs, ys): (Vec<u32>, Vec<u32>) = input.iter().cloned().unzip();
+        let range_x = *xs.iter().min().unwrap()..=*xs.iter().max().unwrap();
+        let range_y = *ys.iter().min().unwrap()..=*ys.iter().max().unwrap();
+
+        // compute grid to exactly cover our input points
+        range_x.cartesian_product(range_y).collect_vec()
     }
 
     fn find_nearest(home: &Point, others: &[Point]) -> Point {
