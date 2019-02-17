@@ -3,20 +3,29 @@ mod test {
     use itertools::Itertools;
 
     #[test]
-    fn parse_sample() {
+    fn samples() {
         let input = "2 3 0 3 10 11 12 1 1 0 1 99 2 1 1 2";
+        let node = &parse_input(input)[0];
 
+        assert_eq!(sum_metadata(node), 138);
+    }
+
+    fn sum_metadata(l: &LicenseNode) -> usize {
+        l.metadata.iter().sum::<usize>()
+            + l.children
+                .iter()
+                .map(|child| sum_metadata(child))
+                .sum::<usize>()
+    }
+
+    fn parse_input(input: &str) -> Vec<LicenseNode> {
         let vec = input
             .trim()
             .split_whitespace()
             .map(|s| s.parse::<usize>().unwrap())
             .collect_vec();
-        dbg!(&vec);
-        dbg!(parse_entire_input(&vec));
-    }
 
-    fn parse_entire_input(input: &[usize]) -> Vec<LicenseNode> {
-        let (vec, remainder) = parse_n_nodes(1, input);
+        let (vec, remainder) = parse_n_nodes(1, &vec);
         assert!(remainder.is_empty(), "entire input should be consumed");
         assert_eq!(vec.len(), 1, "exactly one node should be returned");
         vec
@@ -48,7 +57,7 @@ mod test {
 
     #[derive(Debug)]
     struct LicenseNode {
-        children: Vec<LicenseNode>,
-        metadata: Vec<usize>,
+        pub children: Vec<LicenseNode>,
+        pub metadata: Vec<usize>,
     }
 }
