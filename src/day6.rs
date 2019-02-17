@@ -19,7 +19,7 @@ mod test {
     }
 
     fn run(points: &[Point]) -> usize {
-        // find bounds, to figure out which are infinite
+        // find bounds, to allow us to brute force
         let (xs, ys): (Vec<u32>, Vec<u32>) = points.iter().cloned().unzip();
         let range_x = *xs.iter().min().unwrap()..=*xs.iter().max().unwrap();
         let range_y = *ys.iter().min().unwrap()..=*ys.iter().max().unwrap();
@@ -29,16 +29,6 @@ mod test {
             range_x,
             range_y
         );
-
-        // figure out which are internal points
-        let internal: Vec<Point> = points
-            .iter()
-            .filter(|&(x, y)| {
-                range_x.start() < x && x < range_x.end() && range_y.start() < y && y < range_y.end()
-            })
-            .cloned()
-            .collect();
-        println!("Internal points: {}", internal.len());
 
         // compute grid to exactly cover our input points
         let grid: Vec<Point> = range_x.cartesian_product(range_y).collect_vec();
