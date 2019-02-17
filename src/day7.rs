@@ -13,14 +13,13 @@ mod test {
     fn example() {
         let input = sample_input();
         assert_eq!(solve_part1(&input), "CABDFE".to_string());
-
-        solve_part2(&input);
     }
 
     #[test]
     fn real_data() {
         let input = real_input();
         assert_eq!(solve_part1(&input), "BFKEGNOVATIHXYZRMCJDLSUPWQ");
+        assert_eq!(solve_part2(&input), 1020);
     }
 
     fn solve_part1(dependencies: &[Dependency]) -> String {
@@ -52,7 +51,7 @@ mod test {
         order.iter().collect()
     }
 
-    fn solve_part2(dependencies: &[Dependency]) {
+    fn solve_part2(dependencies: &[Dependency]) -> Time {
         let ids = step_ids(&dependencies);
 
         // Step A (key) requires C (values) to be complete
@@ -60,43 +59,38 @@ mod test {
         for dep in dependencies {
             back_edges.entry(dep.step).or_default().push(dep.prereq);
         }
-        dbg!(&back_edges);
 
-        let mut workers = WorkerPool::new(1);
+        let mut workers = WorkerPool::new(5);
+        while !back_edges.is_empty() || workers.in_progress() {
+            // determine next possible work (keys of back_edges are already sorted)
+            let next_steps: Vec<StepId> = back_edges
+                .iter()
+                .filter(|(_, prereqs)| prereqs.is_empty())
+                .map(|(&step, _)| step)
+                .take(workers.available() as usize)
+                .collect();
 
-        while !back_edges.is_empty() {
-            while workers.available() {
-                let step = *back_edges
-                    .iter()
-                    .filter(|(_node, prereqs)| prereqs.is_empty())
-                    .next()
-                    .expect("No step found with zero prereqs")
-                    .0;
-
-                let duration = step_duration(step);
-                workers.begin_work(step, duration);
-
-                // remove from the graph so nobody else tries to start this work
+            // track worker utilisation & remove from the graph so nobody else tries to start this work
+            for step in next_steps {
+                workers.begin_work(step, step_duration(step));
                 back_edges.remove(&step);
             }
 
-            dbg!(&workers);
-
+            // advance the clock & unblock new tasks if possible
             if let Some(completed) = workers.tick() {
-                // unblock new tasks
                 for (_, prereqs) in &mut back_edges {
-                    prereqs.retain(|prereq| completed.contains(prereq));
+                    prereqs.retain(|prereq| !completed.contains(prereq));
                 }
             }
         }
+
+        workers.time()
     }
 
     fn step_duration(step: StepId) -> Time {
-//        (step as usize - 'A' as usize) + 61
-        (step as usize - 'A' as usize) + 1
+        (step as usize - 'A' as usize) + 61
     }
 
-    #[ignore]
     #[test]
     fn test_step_duration() {
         assert_eq!(step_duration('A'), 61);
@@ -120,17 +114,31 @@ mod test {
             WorkerPool {
                 time: 0,
                 available_workers: num_workers,
-                in_progress: HashMap::new()
+                in_progress: HashMap::new(),
             }
         }
 
-        fn available(&self) -> bool {
-            self.available_workers > 0
+        fn in_progress(&self) -> bool {
+            !self.in_progress.is_empty()
+        }
+
+        fn time(&self) -> Time {
+            self.time
+        }
+
+        fn available(&self) -> u32 {
+            self.available_workers
         }
 
         fn begin_work(&mut self, step_id: StepId, duration: Time) {
-            assert!(self.available(), "tried to begin work but no worker available");
-            assert!(!self.in_progress.contains_key(&step_id), "Can't schedule work already running");
+            assert!(
+                self.available() > 0,
+                "tried to begin work but no worker available"
+            );
+            assert!(
+                !self.in_progress.contains_key(&step_id),
+                "Can't schedule work already running"
+            );
             self.available_workers -= 1;
             self.in_progress.insert(step_id, self.time + duration);
         }
@@ -206,7 +214,7 @@ mod test {
             Dependency::from_str("Step C must be finished before step A can begin.").unwrap(),
             Dependency {
                 step: 'A',
-                prereq: 'C'
+                prereq: 'C',
             }
         );
 
