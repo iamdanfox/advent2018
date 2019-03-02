@@ -24,35 +24,50 @@ mod test {
     }
 
     impl Game {
-        fn next(&mut self) {
+        // returns true iff game should continue (i.e. there are marbles remaining)
+        fn next(&mut self) -> bool {
             let marble = self.next_marble;
-            let circle_current = self.circle_current;
-
-            let index_to_insert = if self.circle.len() == 1 {
-                1
-            } else {
-                (circle_current + 2) % (self.circle.len() + 1)
-            };
+            let index_to_insert = self.index_to_insert();
 
             self.circle.insert(index_to_insert, marble);
             self.circle_current = index_to_insert;
 
-            self.next_player = PlayerId(self.next_player.0 + 1);
+            if self.next_marble.0 + 1 == self.num_marbles {
+                return false;
+            }
+
             self.next_marble = Marble(self.next_marble.0 + 1);
+            self.next_player = PlayerId(self.next_player.0 % self.num_players + 1);
+
+            true
+        }
+
+        fn index_to_insert(&self) -> usize {
+            if self.circle.len() == 1 {
+                return 1;
+            }
+
+            let next = (self.circle_current + 2) % self.circle.len();
+            if next == 0 {
+                // prefer adding to the end of the vec rather than shifting everything along
+                return self.circle.len();
+            }
+
+            next
         }
     }
 
     impl Debug for Game {
         fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
             f.write_char('[')?;
-            (self.next_player.0 - 1).fmt(f)?;
+            self.next_player.0.fmt(f)?;
             f.write_char(']')?;
 
             for (index, marble) in self.circle.iter().enumerate() {
                 if index == self.circle_current {
-                    f.write_char('(');
+                    f.write_char('(')?;
                     marble.0.fmt(f)?;
-                    f.write_char(')');
+                    f.write_char(')')?;
                 } else {
                     f.write_char(' ')?;
                     marble.0.fmt(f)?;
@@ -76,13 +91,8 @@ mod test {
             next_marble: Marble(1),
         };
 
-        game.next();
-        dbg!(&game);
-        game.next();
-        dbg!(&game);
-        game.next();
-        dbg!(&game);
-        game.next();
-        dbg!(&game);
+        while game.next() {
+            dbg!(&game);
+        }
     }
 }
