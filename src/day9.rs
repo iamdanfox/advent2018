@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test {
     use core::fmt::Write;
+    use itertools::Itertools;
     use std::collections::HashMap;
     use std::fmt::Debug;
     use std::fmt::Error;
@@ -24,6 +25,15 @@ mod test {
     }
 
     impl Game {
+        fn winner(&self) -> (PlayerId, usize) {
+            let (player_id, score) = self
+                .scores
+                .iter()
+                .max_by_key(|&(_, &score)| score)
+                .expect("Must have at least one player");
+            (*player_id, *score)
+        }
+
         // returns true iff game should continue (i.e. there are marbles remaining)
         fn next(&mut self) -> bool {
             let marble = self.next_marble;
@@ -54,7 +64,7 @@ mod test {
 
         fn proceed_turn(&mut self) -> bool {
             if self.next_marble.0 > self.max_marble {
-                return false // game ends
+                return false; // game ends
             }
 
             self.next_marble = Marble(self.next_marble.0 + 1);
@@ -118,5 +128,7 @@ mod test {
         while game.next() {
             dbg!(&game);
         }
+
+        dbg!(game.winner());
     }
 }
