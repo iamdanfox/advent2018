@@ -168,9 +168,17 @@ mod test {
     }
 
     #[test]
-    fn real_data() {
+    fn part1() {
         let mut game = Game::new(458, 72019);
         while game.next() {}
         assert_eq!(game.winner().1, 404502);
+    }
+
+    #[ignore]
+    #[test]
+    fn part2() {
+        let mut game = Game::new(458, 72019 * 100);
+        while game.next() {}
+        assert_eq!(game.winner().1, 99999); // TODO(dfox) need to use something more efficient here
     }
 }
