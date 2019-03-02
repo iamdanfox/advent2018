@@ -15,7 +15,7 @@ mod test {
 
     struct Game {
         num_players: usize,
-        num_marbles: usize,
+        max_marble: usize,
         scores: HashMap<PlayerId, usize>,
         circle: Vec<Marble>,
         circle_current: usize,
@@ -27,22 +27,46 @@ mod test {
         // returns true iff game should continue (i.e. there are marbles remaining)
         fn next(&mut self) -> bool {
             let marble = self.next_marble;
-            let index_to_insert = self.index_to_insert();
 
-            self.circle.insert(index_to_insert, marble);
-            self.circle_current = index_to_insert;
+            if marble.0 % 23 == 0 {
+                // the current player keeps the marble they would have placed, adding it to their score
+                *self.scores.entry(self.next_player).or_default() += marble.0;
 
-            if self.next_marble.0 + 1 == self.num_marbles {
-                return false;
+                // the marble 7 marbles counter-clockwise from the current marble is removed from the circle
+                let index = self.index_backwards_7();
+                let removed_marble = self.circle.remove(index);
+
+                // and also added to the current player's score
+                *self.scores.entry(self.next_player).or_default() += removed_marble.0;
+
+                // The marble located immediately clockwise of the marble that was removed becomes the new current marble
+                self.circle_current = index;
+
+                return self.proceed_turn();
+            }
+
+            let index = self.index_forwards_2();
+            self.circle.insert(index, marble);
+            self.circle_current = index;
+
+            self.proceed_turn()
+        }
+
+        fn proceed_turn(&mut self) -> bool {
+            if self.next_marble.0 > self.max_marble {
+                return false // game ends
             }
 
             self.next_marble = Marble(self.next_marble.0 + 1);
             self.next_player = PlayerId(self.next_player.0 % self.num_players + 1);
-
             true
         }
 
-        fn index_to_insert(&self) -> usize {
+        fn index_backwards_7(&self) -> usize {
+            (self.circle_current + self.circle.len() - 7) % self.circle.len()
+        }
+
+        fn index_forwards_2(&self) -> usize {
             if self.circle.len() == 1 {
                 return 1;
             }
@@ -83,7 +107,7 @@ mod test {
     fn sample_data() {
         let mut game = Game {
             num_players: 9,
-            num_marbles: 25,
+            max_marble: 25,
             scores: HashMap::new(),
             circle: vec![Marble(0)],
             circle_current: 0,
