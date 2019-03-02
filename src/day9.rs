@@ -25,6 +25,18 @@ mod test {
     }
 
     impl Game {
+        fn new(num_players: usize, max_marble: usize) -> Game {
+            Game {
+                num_players,
+                max_marble,
+                scores: HashMap::new(),
+                circle: vec![Marble(0)],
+                circle_current: 0,
+                next_player: PlayerId(1),
+                next_marble: Marble(1),
+            }
+        }
+
         fn winner(&self) -> (PlayerId, usize) {
             let (player_id, score) = self
                 .scores
@@ -114,21 +126,44 @@ mod test {
     }
 
     #[test]
-    fn sample_data() {
-        let mut game = Game {
-            num_players: 9,
-            max_marble: 25,
-            scores: HashMap::new(),
-            circle: vec![Marble(0)],
-            circle_current: 0,
-            next_player: PlayerId(1),
-            next_marble: Marble(1),
-        };
+    fn sample_data_1() {
+        let mut game = Game::new(9, 25);
+        while game.next() {}
+        assert_eq!(game.winner(), (PlayerId(5), 32));
+    }
 
-        while game.next() {
-            dbg!(&game);
-        }
+    #[test]
+    fn sample_data_2() {
+        let mut game = Game::new(10, 1618);
+        while game.next() {}
+        assert_eq!(game.winner().1, 8317);
+    }
 
-        dbg!(game.winner());
+    #[test]
+    fn sample_data_3() {
+        let mut game = Game::new(13, 7999);
+        while game.next() {}
+        assert_eq!(game.winner().1, 146373);
+    }
+
+    #[test]
+    fn sample_data_4() {
+        let mut game = Game::new(17, 1104);
+        while game.next() {}
+        assert_eq!(game.winner().1, 2764);
+    }
+
+    #[test]
+    fn sample_data_5() {
+        let mut game = Game::new(21, 6111);
+        while game.next() {}
+        assert_eq!(game.winner().1, 54718);
+    }
+
+    #[test]
+    fn sample_data_6() {
+        let mut game = Game::new(30, 5807);
+        while game.next() {}
+        assert_eq!(game.winner().1, 37305);
     }
 }
