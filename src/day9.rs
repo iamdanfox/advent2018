@@ -166,4 +166,11 @@ mod test {
         while game.next() {}
         assert_eq!(game.winner().1, 37305);
     }
+
+    #[test]
+    fn real_data() {
+        let mut game = Game::new(458, 72019);
+        while game.next() {}
+        assert_eq!(game.winner().1, 404502);
+    }
 }
