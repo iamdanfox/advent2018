@@ -203,10 +203,10 @@ mod test {
                 return Ok(Event::WakesUp);
             } else {
                 lazy_static! {
-                    static ref re: Regex =
+                    static ref RE: Regex =
                         Regex::new(r"^Guard #(?P<id>\d+) begins shift$").unwrap();
                 }
-                let captures = re.captures(s).unwrap();
+                let captures = RE.captures(s).unwrap();
                 let id: u32 = captures.name("id").unwrap().as_str().parse().unwrap();
                 return Ok(Event::GuardBeginsShift(id));
             }
@@ -218,9 +218,9 @@ mod test {
 
         fn from_str(line: &str) -> Result<Self, <Self as FromStr>::Err> {
             lazy_static! {
-                static ref re: Regex = Regex::new(r"^\[(?P<datetime>.+)\] (?P<event>.+)$").unwrap();
+                static ref RE: Regex = Regex::new(r"^\[(?P<datetime>.+)\] (?P<event>.+)$").unwrap();
             }
-            let captures = re.captures(line).unwrap();
+            let captures = RE.captures(line).unwrap();
 
             let datetime = captures.name("datetime").unwrap().as_str();
 

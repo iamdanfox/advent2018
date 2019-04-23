@@ -79,9 +79,9 @@ mod test {
 
         fn from_str(line: &str) -> Result<Self, Self::Err> {
             lazy_static! {
-                static ref re: Regex = Regex::new(r"^#(?P<id>\d+) @ (?P<offset_left>\d+),(?P<offset_top>\d+): (?P<width>\d+)x(?P<height>\d+)$").unwrap();
+                static ref RE: Regex = Regex::new(r"^#(?P<id>\d+) @ (?P<offset_left>\d+),(?P<offset_top>\d+): (?P<width>\d+)x(?P<height>\d+)$").unwrap();
             }
-            let captures = re.captures(line).unwrap();
+            let captures = RE.captures(line).unwrap();
 
             Ok(Claim {
                 id: captures.name("id").unwrap().as_str().parse()?,

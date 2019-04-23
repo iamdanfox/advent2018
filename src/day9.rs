@@ -176,6 +176,25 @@ mod test {
         offset: usize,
     }
 
+    impl SegmentedVec {
+
+        fn repartition(&mut self) {
+            let max = 20;
+
+            let mut new_segments:Vec<Vec<Marble>> = Vec::new();
+
+            for segment in self.segments.to_owned() {
+                if segment.len() > max {
+                    let (left, right) = segment.split_at(max / 20);
+                    new_segments.push(Vec::from(left));
+                    new_segments.push(Vec::from(right));
+                } else {
+                    new_segments.push(segment);
+                }
+            }
+        }
+    }
+
     impl Circle<Cursor> for SegmentedVec {
         fn len(&self) -> usize {
             self.segments.iter().map(|segment| segment.len()).sum()
@@ -232,13 +251,14 @@ mod test {
 
         fn insert(&mut self, cursor: &Cursor, element: Marble) {
             match self.segments.get_mut(cursor.segment) {
-                Some(ref mut vec) if cursor.offset < vec.len() => {
+                Some(ref mut vec) => {
                     vec.insert(cursor.offset, element);
                 }
-                _ => {
+                None => {
                     self.segments.push(vec![element]);
                 }
             }
+            self.repartition();
         }
 
         fn remove(&mut self, cursor: &Cursor) -> Marble {
@@ -441,11 +461,11 @@ mod test {
         let mut flat = new_game_flat(9, marbles);
 
         let rounds = 20;
-        for i in 0..rounds {
+        for _ in 0..rounds {
             segmented.next();
             dbg!(&segmented);
         }
-        for i in 0..rounds {
+        for _ in 0..rounds {
             flat.next();
             dbg!(&flat);
         }
