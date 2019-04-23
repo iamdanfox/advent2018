@@ -79,7 +79,6 @@ mod test {
         T: Clone,
         C: Clone,
     {
-
         fn winner(&self) -> (PlayerId, usize) {
             let (player_id, score) = self
                 .scores
@@ -178,7 +177,6 @@ mod test {
     }
 
     impl SegmentedVec {
-
         fn repartition(&mut self, index: usize) {
             let max = 1024;
             let segment = self.segments.get_mut(index).unwrap();
@@ -213,7 +211,8 @@ mod test {
 
             // otherwise, we need to move to a new segment
             let next_segment = (cursor.segment + 1) % self.segments.len();
-            let remaining_steps = steps as isize - (current_segment.len() as isize - cursor.offset as isize);
+            let remaining_steps =
+                steps as isize - (current_segment.len() as isize - cursor.offset as isize);
             let intermediate_cursor = Cursor {
                 segment: next_segment,
                 offset: 0,
@@ -261,7 +260,10 @@ mod test {
             if cursor.offset >= segment.len() {
                 // TODO(dfox): ideally invalid cursors could never exist...
                 let overshot = cursor.offset as isize - segment.len() as isize;
-                return self.remove(&Cursor { segment: cursor.segment + 1, offset: overshot as usize })
+                return self.remove(&Cursor {
+                    segment: cursor.segment + 1,
+                    offset: overshot as usize,
+                });
             }
 
             segment.remove(cursor.offset)
@@ -304,7 +306,7 @@ mod test {
 
     #[derive(Default, Clone)]
     struct FlatVec {
-        marbles: Vec<Marble>
+        marbles: Vec<Marble>,
     }
 
     impl Circle<usize> for FlatVec {
@@ -321,7 +323,8 @@ mod test {
         }
 
         fn seek_back(&self, &cursor: &usize, steps: usize) -> usize {
-            ((cursor as isize) - (steps as isize) + (self.marbles.len() as isize)) as usize % self.marbles.len()
+            ((cursor as isize) - (steps as isize) + (self.marbles.len() as isize)) as usize
+                % self.marbles.len()
         }
 
         fn insert(&mut self, &cursor: &usize, element: Marble) {
@@ -336,7 +339,7 @@ mod test {
             *cursor
         }
 
-        fn into_iter(self) -> Box<Iterator<Item=Marble>> {
+        fn into_iter(self) -> Box<Iterator<Item = Marble>> {
             Box::new(self.marbles.into_iter())
         }
     }
@@ -457,7 +460,7 @@ mod test {
 
     #[test]
     fn comparative() {
-        let marbles= 45;
+        let marbles = 45;
         let mut segmented = new_game_segmented(9, marbles);
         let mut flat = new_game_flat(9, marbles);
 
