@@ -32,7 +32,7 @@ mod test {
         }
     }
 
-    fn iter_velocities(measurements: &Vec<PointMeasurement>) -> impl Iterator<Item=Grid> {
+    fn iter_velocities(measurements: &Vec<PointMeasurement>) -> impl Iterator<Item = Grid> {
         struct GridIterator {
             points: Vec<PointMeasurement>,
         }
@@ -41,9 +41,10 @@ mod test {
             type Item = Grid;
 
             fn next(&mut self) -> Option<Self::Item> {
-
                 // compute current Grid
-                let g = Grid { points: self.points.iter().map(|p| p.point).collect() };
+                let g = Grid {
+                    points: self.points.iter().map(|p| p.point).collect(),
+                };
 
                 // mutate internals
                 self.points = self.points.iter().map(|p| p.step()).collect();
@@ -52,9 +53,9 @@ mod test {
             }
         }
 
-        let g = Grid { points: measurements.iter().map(|p| p.point).collect() };
-
-        GridIterator { points: (*measurements).clone() }
+        GridIterator {
+            points: (*measurements).clone(),
+        }
     }
 
     impl FromStr for PointMeasurement {
@@ -65,12 +66,24 @@ mod test {
                 static ref RE: Regex = Regex::new(r"^position=< *(?P<point_x>-?\d+), *(?P<point_y>-?\d+)> velocity=< *(?P<velocity_x>-?\d+), *(?P<velocity_y>-?\d+)>$").unwrap();
             }
 
-            let captures = RE.captures(s).expect(&("Regex should match: ".to_string() + s));
+            let captures = RE
+                .captures(s)
+                .expect(&("Regex should match: ".to_string() + s));
 
             let point_x: isize = captures.name("point_x").unwrap().as_str().parse().unwrap();
             let point_y: isize = captures.name("point_y").unwrap().as_str().parse().unwrap();
-            let velocity_x: isize = captures.name("velocity_x").unwrap().as_str().parse().unwrap();
-            let velocity_y: isize = captures.name("velocity_y").unwrap().as_str().parse().unwrap();
+            let velocity_x: isize = captures
+                .name("velocity_x")
+                .unwrap()
+                .as_str()
+                .parse()
+                .unwrap();
+            let velocity_y: isize = captures
+                .name("velocity_y")
+                .unwrap()
+                .as_str()
+                .parse()
+                .unwrap();
 
             Ok(PointMeasurement {
                 point: (point_x, point_y),
@@ -80,13 +93,25 @@ mod test {
     }
 
     struct Grid {
-        points: HashSet<Point>
+        points: HashSet<Point>,
     }
 
     impl Grid {
         fn bounds(&self) -> (Range<isize>, Range<isize>) {
-            let (min_x, max_x) = self.points.iter().map(|&point| point.0).minmax().into_option().expect("Vec must not be empty");
-            let (min_y, max_y) = self.points.iter().map(|&point| point.1).minmax().into_option().expect("Vec must not be empty");
+            let (min_x, max_x) = self
+                .points
+                .iter()
+                .map(|&point| point.0)
+                .minmax()
+                .into_option()
+                .expect("Vec must not be empty");
+            let (min_y, max_y) = self
+                .points
+                .iter()
+                .map(|&point| point.1)
+                .minmax()
+                .into_option()
+                .expect("Vec must not be empty");
 
             return (min_x..max_x, min_y..max_y);
         }
@@ -126,19 +151,26 @@ mod test {
     #[test]
     fn single_line() {
         let result = PointMeasurement::from_str("position=< 9,  1> velocity=< 0,  2>").unwrap();
-        assert_eq!(result, PointMeasurement {
-            point: (9, 1),
-            velocity: (0, 2),
-        })
+        assert_eq!(
+            result,
+            PointMeasurement {
+                point: (9, 1),
+                velocity: (0, 2),
+            }
+        )
     }
 
     #[test]
     fn single_line_with_negatives() {
-        let result = PointMeasurement::from_str("position=<-20620, -41485> velocity=< 2,  4>").unwrap();
-        assert_eq!(result, PointMeasurement {
-            point: (-20620, -41485),
-            velocity: (2, 4),
-        })
+        let result =
+            PointMeasurement::from_str("position=<-20620, -41485> velocity=< 2,  4>").unwrap();
+        assert_eq!(
+            result,
+            PointMeasurement {
+                point: (-20620, -41485),
+                velocity: (2, 4),
+            }
+        )
     }
 
     #[test]
@@ -180,7 +212,10 @@ position=<-6,  0> velocity=< 2,  0>
 position=< 5,  9> velocity=< 1, -2>
 position=<14,  7> velocity=<-2,  0>
 position=<-3,  6> velocity=< 2, -1>"#;
-        string.lines().map(|s| PointMeasurement::from_str(s).expect("line parses")).collect()
+        string
+            .lines()
+            .map(|s| PointMeasurement::from_str(s).expect("line parses"))
+            .collect()
     }
 
     fn real_data() -> Vec<PointMeasurement> {
@@ -193,25 +228,24 @@ position=<-3,  6> velocity=< 2, -1>"#;
 
     #[test]
     fn render_real_data() {
-        let max_iterations = 300;
+        let max_iterations = 20_000;
         let mut last_area = usize::max_value();
         let mut smallest_grid = None;
 
         for (i, g) in iter_velocities(&real_data()).enumerate() {
-            dbg!(i);
             if i == max_iterations {
-                break
+                smallest_grid = None;
+                break;
             }
 
             if g.area() > last_area {
-                smallest_grid = Some(g);
-                break
+                break;
             }
 
             last_area = g.area();
+            smallest_grid = Some(g)
         }
 
-
-//        dbg!(smallest_grid);
+        dbg!(smallest_grid); //  "PHIGRNFK"
     }
 }
