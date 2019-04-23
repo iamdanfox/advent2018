@@ -6,6 +6,7 @@ mod test {
     use std::fmt::Debug;
     use std::fmt::Error;
     use std::fmt::Formatter;
+    use std::thread::current;
 
     #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
     struct PlayerId(usize);
@@ -123,6 +124,64 @@ mod test {
 
             Ok(())
         }
+    }
+
+    #[derive(Default)]
+    struct SegmentedVec {
+        segments: Vec<Vec<Marble>>,
+    }
+
+    /// Points to a slot in the SegmentedVec, but there might not be an element there
+    #[derive(Debug, PartialEq)]
+    struct Cursor {
+        segment: usize,
+        offset: usize,
+    }
+
+    impl SegmentedVec {
+        fn cursor(&self) -> Cursor {
+            Cursor { segment: 0, offset: 0 }
+        }
+
+        fn len(&self) -> usize {
+            self.segments.iter().map(|segment| segment.len()).sum()
+        }
+
+        /// wraps around as necessary
+        fn seek_forward(&self, cursor: &Cursor, steps: usize) -> Cursor {
+            let current_segment = &self.segments[cursor.segment];
+
+            // simplest case first - the desired offset is still within the current segment
+            if cursor.offset + steps < current_segment.len() {
+                return Cursor {
+                    segment: cursor.segment,
+                    offset: cursor.offset + steps,
+                };
+            }
+
+            // otherwise, we need to move to a new segment
+            let next_segment = (cursor.segment + 1) % self.segments.len();
+            let remaining_steps = steps - (current_segment.len() - cursor.offset);
+            let intermediate_cursor = Cursor { segment: next_segment, offset: 0 };
+
+            self.seek_forward(&intermediate_cursor, remaining_steps)
+        }
+    }
+
+    #[test]
+    fn cursor_seek_wraps_nicely() {
+        let s = SegmentedVec {
+            segments: vec![
+                vec![Marble(0), Marble(1), Marble(2)],
+                vec![Marble(3), Marble(4)],
+            ],
+        };
+
+        assert_eq!(s.seek_forward(&Cursor { segment: 0, offset: 0 }, 0), Cursor { segment: 0, offset: 0 });
+        assert_eq!(s.seek_forward(&Cursor { segment: 0, offset: 0 }, 1), Cursor {segment: 0, offset: 1});
+        assert_eq!(s.seek_forward(&Cursor { segment: 0, offset: 0 }, 2), Cursor {segment: 0, offset: 2});
+        assert_eq!(s.seek_forward(&Cursor { segment: 0, offset: 0 }, 3), Cursor {segment: 1, offset: 0});
+        assert_eq!(s.seek_forward(&Cursor { segment: 0, offset: 0 }, 5), Cursor {segment: 0, offset: 0});
     }
 
     #[test]
