@@ -179,25 +179,13 @@ mod test {
 
     impl SegmentedVec {
 
-        fn repartition(&mut self, segment: usize) {
-            let max = 1024 * 4;
-
-            if self.segments[segment].len() < max {
-                return; // shortcut
+        fn repartition(&mut self, index: usize) {
+            let max = 1024;
+            let segment = self.segments.get_mut(index).unwrap();
+            if segment.len() > max {
+                let split = segment.split_off(max / 2);
+                self.segments.insert(index + 1, split);
             }
-
-            let mut new_segments:Vec<Vec<Marble>> = Vec::new();
-
-            for segment in self.segments.to_owned() {
-                if segment.len() > max {
-                    let (left, right) = segment.split_at(max / 2);
-                    new_segments.push(Vec::from(left));
-                    new_segments.push(Vec::from(right));
-                } else {
-                    new_segments.push(segment);
-                }
-            }
-            self.segments = new_segments
         }
     }
 
@@ -534,12 +522,7 @@ mod test {
     #[test]
     fn part2() {
         let mut game = new_game_segmented(458, 72019 * 100);
-        while game.next() {
-            // progress reporting
-            if game.next_marble.0 % 1000 == 0 {
-                eprint!("{}% ", (100f32 * (game.next_marble.0 as f32 / game.max_marble as f32)) as usize);
-            }
-        }
-        assert_eq!(game.winner().1, 3243916887); // this took 39 seconds with --release
+        while game.next() {}
+        assert_eq!(game.winner().1, 3243916887); // this took 0.85 seconds with --release
     }
 }
