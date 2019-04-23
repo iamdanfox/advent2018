@@ -4,12 +4,12 @@ mod test {
     use std::collections::HashSet;
     use std::fmt::{Debug, Error, Formatter};
     use std::fs;
+    use std::iter::Skip;
     use std::ops::Range;
     use std::str::FromStr;
 
     use itertools::Itertools;
     use regex::Regex;
-    use std::iter::Skip;
 
     type Point = (isize, isize);
 
@@ -36,7 +36,7 @@ mod test {
         }
     }
 
-    fn iter_velocities(measurements: &Vec<PointMeasurement>) -> impl Iterator<Item = Grid> {
+    fn iter_velocities(measurements: &Vec<PointMeasurement>) -> impl Iterator<Item=Grid> {
         struct GridIterator {
             points: Vec<PointMeasurement>,
             time: usize,
@@ -52,6 +52,7 @@ mod test {
             }
 
             fn nth(&mut self, mut n: usize) -> Option<Self::Item> {
+                // TODO(dfox): should this actually mutate the iterator's time field?
                 Some(Grid {
                     points: self.points.iter()
                         .map(|p| p.step(n).point)
@@ -62,7 +63,7 @@ mod test {
 
         GridIterator {
             points: (*measurements).clone(),
-            time: 0
+            time: 0,
         }
     }
 
@@ -239,8 +240,25 @@ position=<-3,  6> velocity=< 2, -1>"#;
         let max_iterations = 20_000;
         let mut last_area = usize::max_value();
         let mut smallest_grid = None;
+        let real_data = real_data();
 
-        for (i, g) in iter_velocities(&real_data()).enumerate() {
+        // non-linear upward search to find the rough order of magnitute of time we care about
+        let mut iter = iter_velocities(&real_data);
+        let mut samples = Vec::new();
+        for i in 1..20 {
+            let nth = 2 << i;
+            let area = iter.nth(nth as usize).unwrap().area();
+            samples.push((nth, area));
+        }
+        samples.sort_by_key(|&(_, area)| area);
+        dbg!(&samples);
+        samples.truncate(2);
+        samples.sort_by_key(|&(time, _)| time);
+        let start_time = samples[0].0;
+
+        // TODO(dfox): use this start_time to avoid granular searches early on in time
+
+        for (i, g) in iter_velocities(&real_data).enumerate() {
             if i == max_iterations {
                 smallest_grid = None;
                 break;
