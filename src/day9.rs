@@ -14,32 +14,55 @@ mod test {
     #[derive(Debug, PartialEq, Copy, Clone)]
     struct Marble(usize);
 
-    struct Game {
+    #[derive(Clone)]
+    struct Game<T, C>
+    where
+        T: Circle<C>,
+        T: Clone,
+        C: Clone,
+    {
         num_players: usize,
         max_marble: usize,
         scores: HashMap<PlayerId, usize>,
-        circle: SegmentedVec,
-        circle_current: Cursor,
+        circle: T,
+        circle_current: C,
         next_player: PlayerId,
         next_marble: Marble,
     }
 
-    impl Game {
-        fn new(num_players: usize, max_marble: usize) -> Game {
-            let mut circle = SegmentedVec::default();
-            let initial_cursor = Cursor::default();
-            circle.insert(&initial_cursor, Marble(0));
+    trait Circle<Crsr> {
+        fn len(&self) -> usize;
+        fn get(&self, cursor: &Crsr) -> Option<&Marble>;
+        fn seek_forward(&self, cursor: &Crsr, steps: usize) -> Crsr;
+        fn seek_back(&self, cursor: &Crsr, steps: usize) -> Crsr;
+        fn insert(&mut self, cursor: &Crsr, element: Marble);
+        fn remove(&mut self, cursor: &Crsr) -> Marble;
+        fn cursor_to_index(&self, cursor: &Crsr) -> usize;
+        fn into_iter(self) -> Box<Iterator<Item = Marble>>;
+    }
 
-            Game {
-                num_players,
-                max_marble,
-                scores: HashMap::new(),
-                circle,
-                circle_current: initial_cursor,
-                next_player: PlayerId(1),
-                next_marble: Marble(1),
-            }
+    fn new_game(num_players: usize, max_marble: usize) -> Game<SegmentedVec, Cursor> {
+        let mut circle = SegmentedVec::default();
+        let initial_cursor = Cursor::default();
+        circle.insert(&initial_cursor, Marble(0));
+
+        Game {
+            num_players,
+            max_marble,
+            scores: HashMap::new(),
+            circle,
+            circle_current: initial_cursor,
+            next_player: PlayerId(1),
+            next_marble: Marble(1),
         }
+    }
+
+    impl<T, C> Game<T, C>
+    where
+        T: Circle<C>,
+        T: Clone,
+        C: Clone,
+    {
 
         fn winner(&self) -> (PlayerId, usize) {
             let (player_id, score) = self
@@ -88,28 +111,21 @@ mod test {
             true
         }
 
-        fn index_backwards_7(&self) -> Cursor {
+        fn index_backwards_7(&self) -> C {
             self.circle.seek_back(&self.circle_current, 7)
         }
 
-        fn index_forwards_2(&self) -> Cursor {
+        fn index_forwards_2(&self) -> C {
             self.circle.seek_forward(&self.circle_current, 2)
-
-            //            if self.circle.len() == 1 {
-            //                return 1;
-            //            }
-            //
-            //            let next = (self.circle_current + 2) % self.circle.len();
-            //            if next == 0 {
-            //                // prefer adding to the end of the vec rather than shifting everything along
-            //                return self.circle.len();
-            //            }
-            //
-            //            next
         }
     }
 
-    impl Debug for Game {
+    impl<T, C> Debug for Game<T, C>
+    where
+        T: Circle<C>,
+        T: Clone,
+        C: Clone,
+    {
         fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
             f.write_char('[')?;
             self.next_player.0.fmt(f)?;
@@ -117,7 +133,7 @@ mod test {
 
             let current_index = self.circle.cursor_to_index(&self.circle_current);
 
-            for (index, marble) in self.circle.iter().enumerate() {
+            for (index, marble) in self.circle.clone().into_iter().enumerate() {
                 if index == current_index {
                     f.write_char('(')?;
                     marble.0.fmt(f)?;
@@ -133,210 +149,233 @@ mod test {
         }
     }
 
-    #[derive(Default)]
+    #[derive(Default, Clone)]
     struct SegmentedVec {
-        marbles: Vec<Marble>,
-    }
-
-    impl SegmentedVec {
-        fn iter(&self) -> impl Iterator<Item=&Marble> + '_ {
-            self.marbles.iter()
-
-//            struct SegmentedVecIter<'a> {
-//                vec: &'a SegmentedVec,
-//                cursor: Cursor,
-//            }
-//
-//            impl<'a> Iterator for SegmentedVecIter<'a> {
-//                type Item = Marble;
-//
-//                fn next(&mut self) -> Option<Self::Item> {
-//                    let item = self.vec.get(&self.cursor).map(|&m| m);
-//                    self.cursor = self.vec.seek_forward(&self.cursor, 1);
-//
-//                    item
-//                }
-//            }
-//
-//            let iter = SegmentedVecIter {
-//                vec: &self,
-//                cursor: Cursor::default(),
-//            };
-//            iter.take(self.len())
-        }
+        segments: Vec<Vec<Marble>>,
     }
 
     /// Points to a slot in the SegmentedVec, but there might not be an element there
-    #[derive(Debug, PartialEq, Default)]
+    #[derive(Debug, PartialEq, Default, Clone)]
     struct Cursor {
-        //        segment: usize,
+        segment: usize,
         offset: usize,
     }
 
-    impl SegmentedVec {
+    impl Circle<Cursor> for SegmentedVec {
         fn len(&self) -> usize {
-            self.marbles.len()
-//            self.segments.iter().map(|segment| segment.len()).sum()
+            self.segments.iter().map(|segment| segment.len()).sum()
         }
 
         fn get(&self, cursor: &Cursor) -> Option<&Marble> {
-            self.marbles.get(cursor.offset)
-//            let segment = self.segments.get(cursor.segment)?;
-//            segment.get(cursor.offset)
+            let segment = self.segments.get(cursor.segment)?;
+            segment.get(cursor.offset)
         }
 
         /// wraps around as necessary
         fn seek_forward(&self, cursor: &Cursor, steps: usize) -> Cursor {
-            let new_index = (cursor.offset + steps) % self.marbles.len();
-            Cursor { offset: new_index }
+            let current_segment = &self.segments[cursor.segment];
 
-//            let current_segment = &self.segments[cursor.segment];
-//
-//            // simplest case first - the desired offset is still within the current segment
-//            if cursor.offset + steps < current_segment.len() {
-//                return Cursor {
-//                    segment: cursor.segment,
-//                    offset: cursor.offset + steps,
-//                };
-//            }
-//
-//            // otherwise, we need to move to a new segment
-//            let next_segment = (cursor.segment + 1) % self.segments.len();
-//            let remaining_steps = steps - (current_segment.len() - cursor.offset);
-//            let intermediate_cursor = Cursor {
-//                segment: next_segment,
-//                offset: 0,
-//            };
-//
-//            self.seek_forward(&intermediate_cursor, remaining_steps)
+            // simplest case first - the desired offset is still within the current segment
+            if cursor.offset + steps < current_segment.len() {
+                return Cursor {
+                    segment: cursor.segment,
+                    offset: cursor.offset + steps,
+                };
+            }
+
+            // otherwise, we need to move to a new segment
+            let next_segment = (cursor.segment + 1) % self.segments.len();
+            let remaining_steps = steps - (current_segment.len() - cursor.offset);
+            let intermediate_cursor = Cursor {
+                segment: next_segment,
+                offset: 0,
+            };
+
+            self.seek_forward(&intermediate_cursor, remaining_steps)
         }
 
         fn seek_back(&self, cursor: &Cursor, steps: usize) -> Cursor {
-            let new_index = ((cursor.offset as isize) - (steps as isize) + (self.marbles.len() as isize)) as usize % self.marbles.len() as usize;
-            Cursor { offset: new_index }
+            let current_segment = &self.segments[cursor.segment];
+
+            // simplest case first - the desired offset is still within the current segment
+            if (cursor.offset as isize) - (steps as isize) >= 0 {
+                return Cursor {
+                    segment: cursor.segment,
+                    offset: cursor.offset - steps,
+                };
+            }
+
+            let next_segment = (cursor.segment as isize + self.segments.len() as isize - 1)
+                as usize
+                % self.segments.len();
+            let remaining_steps = steps - cursor.offset;
+            let intermediate_cursor = Cursor {
+                segment: next_segment,
+                offset: self.segments[next_segment].len(),
+            };
+
+            self.seek_back(&intermediate_cursor, remaining_steps)
         }
 
         fn insert(&mut self, cursor: &Cursor, element: Marble) {
-            self.marbles.insert(cursor.offset, element)
+            match self.segments.get_mut(cursor.segment) {
+                Some(ref mut vec) if vec.len() < 20 => {
+                    vec.insert(cursor.offset, element);
+                }
+                _ => {
+                    self.segments.push(vec![element]);
+                }
+            }
         }
 
         fn remove(&mut self, cursor: &Cursor) -> Marble {
-            self.marbles.remove(cursor.offset)
+            let mut segment = self.segments.get_mut(cursor.segment).unwrap();
+            segment.remove(cursor.offset)
         }
 
         fn cursor_to_index(&self, cursor: &Cursor) -> usize {
-            cursor.offset
+            self.segments
+                .iter()
+                .take(cursor.segment)
+                .map(|vec| vec.len())
+                .sum::<usize>()
+                + cursor.offset
+        }
+
+        fn into_iter(self) -> Box<Iterator<Item = Marble>> {
+            struct SegmentedVecIter {
+                vec: SegmentedVec,
+                cursor: Cursor,
+            }
+
+            impl Iterator for SegmentedVecIter {
+                type Item = Marble;
+
+                fn next(&mut self) -> Option<Self::Item> {
+                    let item = self.vec.get(&self.cursor).map(|&m| m);
+                    self.cursor = self.vec.seek_forward(&self.cursor, 1);
+
+                    item
+                }
+            }
+
+            let len = self.len();
+            let iter = SegmentedVecIter {
+                vec: self,
+                cursor: Cursor::default(),
+            };
+            Box::new(iter.take(len))
         }
     }
 
-//    #[test]
-//    fn cursor_seek_wraps_nicely() {
-//        let s = SegmentedVec {
-//            marbles: vec![
-//                vec![Marble(0), Marble(1), Marble(2)],
-//                vec![Marble(3), Marble(4)],
-//            ],
-//        };
-//
-//        assert_eq!(
-//            s.seek_forward(
-//                &Cursor {
-//                    segment: 0,
-//                    offset: 0,
-//                },
-//                0,
-//            ),
-//            Cursor {
-//                segment: 0,
-//                offset: 0,
-//            }
-//        );
-//        assert_eq!(
-//            s.seek_forward(
-//                &Cursor {
-//                    segment: 0,
-//                    offset: 0,
-//                },
-//                1,
-//            ),
-//            Cursor {
-//                segment: 0,
-//                offset: 1,
-//            }
-//        );
-//        assert_eq!(
-//            s.seek_forward(
-//                &Cursor {
-//                    segment: 0,
-//                    offset: 0,
-//                },
-//                2,
-//            ),
-//            Cursor {
-//                segment: 0,
-//                offset: 2,
-//            }
-//        );
-//        assert_eq!(
-//            s.seek_forward(
-//                &Cursor {
-//                    segment: 0,
-//                    offset: 0,
-//                },
-//                3,
-//            ),
-//            Cursor {
-//                segment: 1,
-//                offset: 0,
-//            }
-//        );
-//        assert_eq!(
-//            s.seek_forward(
-//                &Cursor {
-//                    segment: 0,
-//                    offset: 0,
-//                },
-//                5,
-//            ),
-//            Cursor {
-//                segment: 0,
-//                offset: 0,
-//            }
-//        );
-//
-//        assert_eq!(
-//            s.seek_back(
-//                &Cursor {
-//                    segment: 0,
-//                    offset: 2,
-//                },
-//                3,
-//            ),
-//            Cursor {
-//                segment: 1,
-//                offset: 1,
-//            }
-//        );
-//    }
+    #[test]
+    fn cursor_seek_wraps_nicely() {
+        let s = SegmentedVec {
+            segments: vec![
+                vec![Marble(0), Marble(1), Marble(2)],
+                vec![Marble(3), Marble(4)],
+            ],
+        };
 
-//    #[test]
-//    fn segmented_vec_iter_behaves() {
-//        let s = SegmentedVec {
-//            marbles: vec![
-//                vec![Marble(0), Marble(1), Marble(2)],
-//                vec![Marble(3), Marble(4)],
-//            ],
-//        };
-//
-//        assert_eq!(
-//            s.iter().collect_vec(),
-//            vec![Marble(0), Marble(1), Marble(2), Marble(3), Marble(4)]
-//        );
-//    }
+        assert_eq!(
+            s.seek_forward(
+                &Cursor {
+                    segment: 0,
+                    offset: 0,
+                },
+                0,
+            ),
+            Cursor {
+                segment: 0,
+                offset: 0,
+            }
+        );
+        assert_eq!(
+            s.seek_forward(
+                &Cursor {
+                    segment: 0,
+                    offset: 0,
+                },
+                1,
+            ),
+            Cursor {
+                segment: 0,
+                offset: 1,
+            }
+        );
+        assert_eq!(
+            s.seek_forward(
+                &Cursor {
+                    segment: 0,
+                    offset: 0,
+                },
+                2,
+            ),
+            Cursor {
+                segment: 0,
+                offset: 2,
+            }
+        );
+        assert_eq!(
+            s.seek_forward(
+                &Cursor {
+                    segment: 0,
+                    offset: 0,
+                },
+                3,
+            ),
+            Cursor {
+                segment: 1,
+                offset: 0,
+            }
+        );
+        assert_eq!(
+            s.seek_forward(
+                &Cursor {
+                    segment: 0,
+                    offset: 0,
+                },
+                5,
+            ),
+            Cursor {
+                segment: 0,
+                offset: 0,
+            }
+        );
+
+        assert_eq!(
+            s.seek_back(
+                &Cursor {
+                    segment: 0,
+                    offset: 2,
+                },
+                3,
+            ),
+            Cursor {
+                segment: 1,
+                offset: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn segmented_vec_iter_behaves() {
+        let s = SegmentedVec {
+            segments: vec![
+                vec![Marble(0), Marble(1), Marble(2)],
+                vec![Marble(3), Marble(4)],
+            ],
+        };
+
+        assert_eq!(
+            s.into_iter().collect_vec(),
+            vec![Marble(0), Marble(1), Marble(2), Marble(3), Marble(4)]
+        );
+    }
 
     #[test]
     fn sample_data_1() {
-        let mut game = Game::new(9, 25);
+        let mut game = new_game(9, 25);
         while game.next() {
             dbg!(&game);
         }
@@ -345,42 +384,42 @@ mod test {
 
     #[test]
     fn sample_data_2() {
-        let mut game = Game::new(10, 1618);
+        let mut game = new_game(10, 1618);
         while game.next() {}
         assert_eq!(game.winner().1, 8317);
     }
 
     #[test]
     fn sample_data_3() {
-        let mut game = Game::new(13, 7999);
+        let mut game = new_game(13, 7999);
         while game.next() {}
         assert_eq!(game.winner().1, 146373);
     }
 
     #[test]
     fn sample_data_4() {
-        let mut game = Game::new(17, 1104);
+        let mut game = new_game(17, 1104);
         while game.next() {}
         assert_eq!(game.winner().1, 2764);
     }
 
     #[test]
     fn sample_data_5() {
-        let mut game = Game::new(21, 6111);
+        let mut game = new_game(21, 6111);
         while game.next() {}
         assert_eq!(game.winner().1, 54718);
     }
 
     #[test]
     fn sample_data_6() {
-        let mut game = Game::new(30, 5807);
+        let mut game = new_game(30, 5807);
         while game.next() {}
         assert_eq!(game.winner().1, 37305);
     }
 
     #[test]
     fn part1() {
-        let mut game = Game::new(458, 72019);
+        let mut game = new_game(458, 72019);
         while game.next() {}
         assert_eq!(game.winner().1, 404502);
     }
@@ -388,7 +427,7 @@ mod test {
     #[ignore]
     #[test]
     fn part2() {
-        let mut game = Game::new(458, 72019 * 100);
+        let mut game = new_game(458, 72019 * 100);
         while game.next() {}
         assert_eq!(game.winner().1, 99999); // TODO(dfox) need to use something more efficient here
     }
