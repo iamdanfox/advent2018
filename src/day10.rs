@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod test {
     use core::fmt::Write;
-    use std::cmp::max;
     use std::collections::HashSet;
     use std::fmt::{Debug, Error, Formatter};
     use std::fs;
