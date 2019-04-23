@@ -41,7 +41,7 @@ mod test {
         fn into_iter(self) -> Box<Iterator<Item = Marble>>;
     }
 
-    fn new_game(num_players: usize, max_marble: usize) -> Game<SegmentedVec, Cursor> {
+    fn new_game_segmented(num_players: usize, max_marble: usize) -> Game<SegmentedVec, Cursor> {
         let mut circle = SegmentedVec::default();
         let initial_cursor = Cursor::default();
         circle.insert(&initial_cursor, Marble(0));
@@ -52,6 +52,21 @@ mod test {
             scores: HashMap::new(),
             circle,
             circle_current: initial_cursor,
+            next_player: PlayerId(1),
+            next_marble: Marble(1),
+        }
+    }
+
+    fn new_game_flat(num_players: usize, max_marble: usize) -> Game<FlatVec, usize> {
+        let mut circle = FlatVec::default();
+        circle.insert(&0, Marble(0));
+
+        Game {
+            num_players,
+            max_marble,
+            scores: HashMap::new(),
+            circle,
+            circle_current: 0,
             next_player: PlayerId(1),
             next_marble: Marble(1),
         }
@@ -195,8 +210,6 @@ mod test {
         }
 
         fn seek_back(&self, cursor: &Cursor, steps: usize) -> Cursor {
-            let current_segment = &self.segments[cursor.segment];
-
             // simplest case first - the desired offset is still within the current segment
             if (cursor.offset as isize) - (steps as isize) >= 0 {
                 return Cursor {
@@ -219,7 +232,7 @@ mod test {
 
         fn insert(&mut self, cursor: &Cursor, element: Marble) {
             match self.segments.get_mut(cursor.segment) {
-                Some(ref mut vec) if vec.len() < 20 => {
+                Some(ref mut vec) if cursor.offset < vec.len() => {
                     vec.insert(cursor.offset, element);
                 }
                 _ => {
@@ -229,7 +242,7 @@ mod test {
         }
 
         fn remove(&mut self, cursor: &Cursor) -> Marble {
-            let mut segment = self.segments.get_mut(cursor.segment).unwrap();
+            let segment = self.segments.get_mut(cursor.segment).unwrap();
             segment.remove(cursor.offset)
         }
 
@@ -265,6 +278,45 @@ mod test {
                 cursor: Cursor::default(),
             };
             Box::new(iter.take(len))
+        }
+    }
+
+    #[derive(Default, Clone)]
+    struct FlatVec {
+        marbles: Vec<Marble>
+    }
+
+    impl Circle<usize> for FlatVec {
+        fn len(&self) -> usize {
+            self.marbles.len()
+        }
+
+        fn get(&self, &cursor: &usize) -> Option<&Marble> {
+            self.marbles.get(cursor)
+        }
+
+        fn seek_forward(&self, &cursor: &usize, steps: usize) -> usize {
+            (cursor + steps) % self.marbles.len()
+        }
+
+        fn seek_back(&self, &cursor: &usize, steps: usize) -> usize {
+            ((cursor as isize) - (steps as isize) + (self.marbles.len() as isize)) as usize % self.marbles.len()
+        }
+
+        fn insert(&mut self, &cursor: &usize, element: Marble) {
+            self.marbles.insert(cursor, element)
+        }
+
+        fn remove(&mut self, &cursor: &usize) -> Marble {
+            self.marbles.remove(cursor)
+        }
+
+        fn cursor_to_index(&self, cursor: &usize) -> usize {
+            *cursor
+        }
+
+        fn into_iter(self) -> Box<Iterator<Item=Marble>> {
+            Box::new(self.marbles.into_iter())
         }
     }
 
@@ -375,7 +427,7 @@ mod test {
 
     #[test]
     fn sample_data_1() {
-        let mut game = new_game(9, 25);
+        let mut game = new_game_segmented(9, 25);
         while game.next() {
             dbg!(&game);
         }
@@ -383,43 +435,65 @@ mod test {
     }
 
     #[test]
+    fn comparative() {
+        let marbles= 45;
+        let mut segmented = new_game_segmented(9, marbles);
+        let mut flat = new_game_flat(9, marbles);
+
+        let rounds = 20;
+        for i in 0..rounds {
+            segmented.next();
+            dbg!(&segmented);
+        }
+        for i in 0..rounds {
+            flat.next();
+            dbg!(&flat);
+        }
+
+        while segmented.next() {}
+        while flat.next() {}
+
+        assert_eq!(segmented.winner().1, flat.winner().1);
+    }
+
+    #[test]
     fn sample_data_2() {
-        let mut game = new_game(10, 1618);
+        let mut game = new_game_segmented(10, 1618);
         while game.next() {}
         assert_eq!(game.winner().1, 8317);
     }
 
     #[test]
     fn sample_data_3() {
-        let mut game = new_game(13, 7999);
+        let mut game = new_game_segmented(13, 7999);
         while game.next() {}
         assert_eq!(game.winner().1, 146373);
     }
 
     #[test]
     fn sample_data_4() {
-        let mut game = new_game(17, 1104);
+        let mut game = new_game_segmented(17, 1104);
         while game.next() {}
         assert_eq!(game.winner().1, 2764);
     }
 
     #[test]
     fn sample_data_5() {
-        let mut game = new_game(21, 6111);
+        let mut game = new_game_segmented(21, 6111);
         while game.next() {}
         assert_eq!(game.winner().1, 54718);
     }
 
     #[test]
     fn sample_data_6() {
-        let mut game = new_game(30, 5807);
+        let mut game = new_game_segmented(30, 5807);
         while game.next() {}
         assert_eq!(game.winner().1, 37305);
     }
 
     #[test]
     fn part1() {
-        let mut game = new_game(458, 72019);
+        let mut game = new_game_segmented(458, 72019);
         while game.next() {}
         assert_eq!(game.winner().1, 404502);
     }
@@ -427,7 +501,7 @@ mod test {
     #[ignore]
     #[test]
     fn part2() {
-        let mut game = new_game(458, 72019 * 100);
+        let mut game = new_game_segmented(458, 72019 * 100);
         while game.next() {}
         assert_eq!(game.winner().1, 99999); // TODO(dfox) need to use something more efficient here
     }
