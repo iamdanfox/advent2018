@@ -9,6 +9,7 @@ mod test {
 
     use itertools::Itertools;
     use regex::Regex;
+    use std::iter::Skip;
 
     type Point = (isize, isize);
 
@@ -22,38 +23,46 @@ mod test {
     }
 
     impl PointMeasurement {
-        fn step(&self) -> PointMeasurement {
+        fn step(&self, time_units: usize) -> PointMeasurement {
+            let mut cloned = self.clone();
+            cloned.step_mut(time_units);
+            cloned
+        }
+
+        fn step_mut(&mut self, time_units: usize) {
             let (x, y) = self.point;
-            PointMeasurement {
-                point: (x + self.velocity.0, y + self.velocity.1),
-                velocity: self.velocity,
-            }
+            self.point.0 = x + self.velocity.0 * time_units as isize;
+            self.point.1 = y + self.velocity.1 * time_units as isize;
         }
     }
 
     fn iter_velocities(measurements: &Vec<PointMeasurement>) -> impl Iterator<Item = Grid> {
         struct GridIterator {
             points: Vec<PointMeasurement>,
+            time: usize,
         }
 
         impl Iterator for GridIterator {
             type Item = Grid;
 
             fn next(&mut self) -> Option<Self::Item> {
-                // compute current Grid
-                let g = Grid {
-                    points: self.points.iter().map(|p| p.point).collect(),
-                };
+                let grid = self.nth(self.time)?;
+                self.time += 1;
+                Some(grid)
+            }
 
-                // mutate internals
-                self.points = self.points.iter().map(|p| p.step()).collect();
-
-                Some(g)
+            fn nth(&mut self, mut n: usize) -> Option<Self::Item> {
+                Some(Grid {
+                    points: self.points.iter()
+                        .map(|p| p.step(n).point)
+                        .collect(),
+                })
             }
         }
 
         GridIterator {
             points: (*measurements).clone(),
+            time: 0
         }
     }
 
@@ -92,7 +101,7 @@ mod test {
     }
 
     struct Grid {
-        points: HashSet<Point>,
+        points: Vec<Point>,
     }
 
     impl Grid {
