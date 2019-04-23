@@ -1,11 +1,12 @@
 #[cfg(test)]
 mod test {
     use core::fmt::Write;
-    use itertools::Itertools;
     use std::collections::HashMap;
     use std::fmt::Debug;
     use std::fmt::Error;
     use std::fmt::Formatter;
+
+    use itertools::Itertools;
 
     #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
     struct PlayerId(usize);
@@ -178,20 +179,25 @@ mod test {
 
     impl SegmentedVec {
 
-        fn repartition(&mut self) {
-            let max = 20;
+        fn repartition(&mut self, segment: usize) {
+            let max = 1024 * 4;
+
+            if self.segments[segment].len() < max {
+                return; // shortcut
+            }
 
             let mut new_segments:Vec<Vec<Marble>> = Vec::new();
 
             for segment in self.segments.to_owned() {
                 if segment.len() > max {
-                    let (left, right) = segment.split_at(max / 20);
+                    let (left, right) = segment.split_at(max / 2);
                     new_segments.push(Vec::from(left));
                     new_segments.push(Vec::from(right));
                 } else {
                     new_segments.push(segment);
                 }
             }
+            self.segments = new_segments
         }
     }
 
@@ -219,13 +225,13 @@ mod test {
 
             // otherwise, we need to move to a new segment
             let next_segment = (cursor.segment + 1) % self.segments.len();
-            let remaining_steps = steps - (current_segment.len() - cursor.offset);
+            let remaining_steps = steps as isize - (current_segment.len() as isize - cursor.offset as isize);
             let intermediate_cursor = Cursor {
                 segment: next_segment,
                 offset: 0,
             };
 
-            self.seek_forward(&intermediate_cursor, remaining_steps)
+            self.seek_forward(&intermediate_cursor, remaining_steps as usize)
         }
 
         fn seek_back(&self, cursor: &Cursor, steps: usize) -> Cursor {
@@ -253,16 +259,23 @@ mod test {
             match self.segments.get_mut(cursor.segment) {
                 Some(ref mut vec) => {
                     vec.insert(cursor.offset, element);
+                    self.repartition(cursor.segment);
                 }
                 None => {
                     self.segments.push(vec![element]);
                 }
             }
-            self.repartition();
         }
 
         fn remove(&mut self, cursor: &Cursor) -> Marble {
             let segment = self.segments.get_mut(cursor.segment).unwrap();
+
+            if cursor.offset >= segment.len() {
+                // TODO(dfox): ideally invalid cursors could never exist...
+                let overshot = cursor.offset as isize - segment.len() as isize;
+                return self.remove(&Cursor { segment: cursor.segment + 1, offset: overshot as usize })
+            }
+
             segment.remove(cursor.offset)
         }
 
@@ -518,11 +531,15 @@ mod test {
         assert_eq!(game.winner().1, 404502);
     }
 
-    #[ignore]
     #[test]
     fn part2() {
         let mut game = new_game_segmented(458, 72019 * 100);
-        while game.next() {}
-        assert_eq!(game.winner().1, 99999); // TODO(dfox) need to use something more efficient here
+        while game.next() {
+            // progress reporting
+            if game.next_marble.0 % 1000 == 0 {
+                eprint!("{}% ", (100f32 * (game.next_marble.0 as f32 / game.max_marble as f32)) as usize);
+            }
+        }
+        assert_eq!(game.winner().1, 3243916887); // this took 39 seconds with --release
     }
 }
