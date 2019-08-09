@@ -1,9 +1,17 @@
 workflow "Do something on every pull request" {
-  resolves = ["./action-a"]
-  on = "pull_request"
+  resolves = ["unit-test"]
+  on = "push"
 }
 
-action "./action-a" {
-  uses = "./action-a"
-  secrets = ["GITHUB_TOKEN"]
+action "prepare" {
+  uses = "docker://node:alpine"
+  runs = "npm"
+  args = "ci"
+}
+
+action "unit-test" {
+  needs = "prepare"
+  uses = "docker://node:alpine"
+  runs = "npm"
+  args = "test"
 }
