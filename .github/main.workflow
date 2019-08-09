@@ -4,7 +4,7 @@ workflow "ci" {
 }
 
 action "do-it" {
-  uses = "docker://circleci/rust"
+  uses = "docker://rust:latest"
   runs = "cargo"
   args = "check"
 }
