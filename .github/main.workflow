@@ -1,10 +1,10 @@
-workflow "Do something on every pull request" {
-  resolves = ["prepare"]
+workflow "ci" {
+  resolves = ["do-it"]
   on = "push"
 }
 
-action "prepare" {
-  uses = "docker://node:alpine"
-  runs = "find"
-  args = "."
+action "do-it" {
+  uses = "docker://circleci/rust"
+  runs = "cargo"
+  args = "check"
 }
